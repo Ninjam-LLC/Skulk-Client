@@ -16,14 +16,14 @@ import java.util.OptionalDouble;
 
 public class SelectionRenderer {
 
-    private static final RenderLayer SELECTION_LAYER = RenderLayer.of(
-            "skulkpk_selection",
+    private static final RenderLayer LINES_NO_DEPTH = RenderLayer.of(
+            "skulkpk_lines_no_depth",
             RenderLayer.getLines().getVertexFormat(),
             RenderLayer.getLines().getDrawMode(),
             256,
             RenderLayer.MultiPhaseParameters.builder()
                     .program(RenderPhase.LINES_PROGRAM)
-                    .lineWidth(new RenderPhase.LineWidth(OptionalDouble.of(5.0)))
+                    .lineWidth(new RenderPhase.LineWidth(OptionalDouble.of(3.0)))
                     .layering(RenderPhase.VIEW_OFFSET_Z_LAYERING)
                     .transparency(RenderPhase.TRANSLUCENT_TRANSPARENCY)
                     .target(RenderPhase.MAIN_TARGET)
@@ -33,23 +33,25 @@ public class SelectionRenderer {
                     .build(false)
     );
 
+    public static void highlightBlock(BlockPos pos, float r, float g, float b, float thickness, MatrixStack matrixStack, VertexConsumerProvider.Immediate immediate, Camera camera) {
+        matrixStack.push();
+        matrixStack.translate(-camera.getPos().x, -camera.getPos().y, -camera.getPos().z);
+
+        VertexConsumer vertexConsumer = immediate.getBuffer(LINES_NO_DEPTH);
+        drawBox(matrixStack, vertexConsumer, new Box(pos), r, g, b, 1.0F);
+        immediate.draw(LINES_NO_DEPTH);
+
+        matrixStack.pop();
+    }
+
     public static void register() {
         WorldRenderEvents.AFTER_ENTITIES.register(context -> {
             BlockPos selectedBlock = BlockSelector.getSelectedBlock();
-            if (selectedBlock != null) {
+            if (selectedBlock != null && context.consumers() instanceof VertexConsumerProvider.Immediate immediate) {
                 MatrixStack matrixStack = context.matrixStack();
                 Camera camera = context.camera();
 
-                matrixStack.push();
-                matrixStack.translate(-camera.getPos().x, -camera.getPos().y, -camera.getPos().z);
-
-                if (context.consumers() instanceof VertexConsumerProvider.Immediate immediate) {
-                    VertexConsumer vertexConsumer = immediate.getBuffer(SELECTION_LAYER);
-                    drawBox(matrixStack, vertexConsumer, new Box(selectedBlock), 1.0F, 0F, 0F, 1.0F);
-                    immediate.draw(SELECTION_LAYER);
-                }
-
-                matrixStack.pop();
+                highlightBlock(selectedBlock, 1.0F, 0F, 0F, 10.0F, matrixStack, immediate, camera);
             }
         });
     }
