@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "skulkpk",
+  "version": "${version}",
+  "name": "Skulk",
+  "description": "",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-datagen": [
+      "com.ariesninja.skulkpk.client.SkulkpkDataGenerator"
+    ],
+    "client": [
+      "com.ariesninja.skulkpk.client.SkulkpkClient"
+    ],
+    "main": [
+      "com.ariesninja.skulkpk.Skulkpk"
+    ]
+  },
+  "mixins": [
+    "skulkpk.mixins.json",
+    {
+      "config": "skulkpk.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
