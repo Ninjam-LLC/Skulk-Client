@@ -82,6 +82,12 @@ public class SelectionRenderer {
                 if (jumpFromBlock != null && !jumpFromBlock.equals(targetToHighlight)) {
                     highlightBlock(jumpFromBlock, 0F, 0F, 1.0F, 3.0F, matrixStack, immediate, camera);
                 }
+
+                // Render the momentum path in yellow
+                BlockPos momentumStartBlock = JumpAnalyzer.getMomentumStartBlock();
+                if (momentumStartBlock != null && jumpFromBlock != null) {
+                    drawMomentumPath(momentumStartBlock, jumpFromBlock, 1.0F, 1.0F, 0F, matrixStack, immediate, camera);
+                }
             }
         });
     }
@@ -133,5 +139,41 @@ public class SelectionRenderer {
 
         vertices.vertex(matrix, minX, minY, maxZ).color(r, g, b, a).normal(0, 1, 0);
         vertices.vertex(matrix, minX, maxY, maxZ).color(r, g, b, a).normal(0, 1, 0);
+    }
+
+    private static void drawMomentumPath(BlockPos start, BlockPos end, float r, float g, float b, MatrixStack matrixStack, VertexConsumerProvider.Immediate immediate, Camera camera) {
+        matrixStack.push();
+        matrixStack.translate(-camera.getPos().x, -camera.getPos().y, -camera.getPos().z);
+
+        VertexConsumer vertexConsumer = immediate.getBuffer(LINES_NO_DEPTH);
+        Matrix4f matrix = matrixStack.peek().getPositionMatrix();
+
+        // Calculate the center points of each block for the line
+        float startX = start.getX() + 0.5f;
+        float startY = start.getY() + 0.5f;
+        float startZ = start.getZ() + 0.5f;
+
+        float endX = end.getX() + 0.5f;
+        float endY = end.getY() + 0.5f;
+        float endZ = end.getZ() + 0.5f;
+
+        // Draw a thick line by drawing multiple parallel lines
+        float thickness = 0.1f;
+
+        // Draw main line
+        vertexConsumer.vertex(matrix, startX, startY, startZ).color(r, g, b, 1.0f).normal(0, 1, 0);
+        vertexConsumer.vertex(matrix, endX, endY, endZ).color(r, g, b, 1.0f).normal(0, 1, 0);
+
+        // Draw additional lines for thickness (offset slightly)
+        for (int i = 0; i < 4; i++) {
+            float offsetX = (i % 2 == 0 ? thickness : -thickness);
+            float offsetZ = (i < 2 ? thickness : -thickness);
+
+            vertexConsumer.vertex(matrix, startX + offsetX, startY, startZ + offsetZ).color(r, g, b, 1.0f).normal(0, 1, 0);
+            vertexConsumer.vertex(matrix, endX + offsetX, endY, endZ + offsetZ).color(r, g, b, 1.0f).normal(0, 1, 0);
+        }
+
+        immediate.draw(LINES_NO_DEPTH);
+        matrixStack.pop();
     }
 }
