@@ -1,6 +1,7 @@
 package com.ariesninja.skulkpk.client.core.rendering;
 
 import com.ariesninja.skulkpk.client.core.BlockSelector;
+import com.ariesninja.skulkpk.client.core.JumpAnalyzer;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.RenderLayer;
@@ -23,7 +24,7 @@ public class SelectionRenderer {
             256,
             RenderLayer.MultiPhaseParameters.builder()
                     .program(RenderPhase.LINES_PROGRAM)
-                    .lineWidth(new RenderPhase.LineWidth(OptionalDouble.of(3.0)))
+                    .lineWidth(new RenderPhase.LineWidth(OptionalDouble.of(10.0)))
                     .layering(RenderPhase.VIEW_OFFSET_Z_LAYERING)
                     .transparency(RenderPhase.TRANSLUCENT_TRANSPARENCY)
                     .target(RenderPhase.MAIN_TARGET)
@@ -32,6 +33,20 @@ public class SelectionRenderer {
                     .writeMaskState(RenderPhase.COLOR_MASK)
                     .build(false)
     );
+
+    private static boolean highlightsVisible = true;
+
+    public static void setHighlightsVisible(boolean visible) {
+        highlightsVisible = visible;
+    }
+
+    public static void hideAllHighlights() {
+        highlightsVisible = false;
+    }
+
+    public static void showHighlights() {
+        highlightsVisible = true;
+    }
 
     public static void highlightBlock(BlockPos pos, float r, float g, float b, float thickness, MatrixStack matrixStack, VertexConsumerProvider.Immediate immediate, Camera camera) {
         matrixStack.push();
@@ -46,12 +61,27 @@ public class SelectionRenderer {
 
     public static void register() {
         WorldRenderEvents.AFTER_ENTITIES.register(context -> {
+            if (!highlightsVisible) {
+                return; // Early exit if highlights should be hidden
+            }
+
             BlockPos selectedBlock = BlockSelector.getSelectedBlock();
             if (selectedBlock != null && context.consumers() instanceof VertexConsumerProvider.Immediate immediate) {
                 MatrixStack matrixStack = context.matrixStack();
                 Camera camera = context.camera();
 
-                highlightBlock(selectedBlock, 1.0F, 0F, 0F, 10.0F, matrixStack, immediate, camera);
+                // Highlight the optimized target block in red (if available, otherwise use selected block)
+                BlockPos targetToHighlight = JumpAnalyzer.getOptimizedTargetBlock();
+                if (targetToHighlight == null) {
+                    targetToHighlight = selectedBlock;
+                }
+                highlightBlock(targetToHighlight, 1.0F, 0F, 0F, 3.0F, matrixStack, immediate, camera);
+
+                // Highlight the jump-from block in blue
+                BlockPos jumpFromBlock = JumpAnalyzer.getJumpFromBlock();
+                if (jumpFromBlock != null && !jumpFromBlock.equals(targetToHighlight)) {
+                    highlightBlock(jumpFromBlock, 0F, 0F, 1.0F, 3.0F, matrixStack, immediate, camera);
+                }
             }
         });
     }

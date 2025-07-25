@@ -2,6 +2,7 @@ package com.ariesninja.skulkpk.client;
 
 import com.ariesninja.skulkpk.client.core.ActionQueue;
 import com.ariesninja.skulkpk.client.core.BlockSelector;
+import com.ariesninja.skulkpk.client.core.JumpAnalyzer;
 import com.ariesninja.skulkpk.client.core.JumpPlanner;
 import com.ariesninja.skulkpk.client.core.Keybinds;
 import com.ariesninja.skulkpk.client.core.rendering.SelectionRenderer;
@@ -26,7 +27,7 @@ public class SkulkpkClient implements ClientModInitializer {
             if (cameraEntity == null) return;
 
             var from = cameraEntity.getEyePos();
-            var rotation = cameraEntity.getRotationVec(client.getRenderTickCounter().getTickDelta(false));
+            var rotation = cameraEntity.getRotationVec(1.0f);
             var to = from.add(rotation.multiply(1000));
 
             var context = new RaycastContext(
@@ -40,6 +41,7 @@ public class SkulkpkClient implements ClientModInitializer {
 
             if (hit.getType() == HitResult.Type.BLOCK) {
                 BlockSelector.selectBlock(hit, client);
+                // Analysis is already handled inside BlockSelector.selectBlock()
             }
         }
 
