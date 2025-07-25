@@ -477,7 +477,7 @@ public class JumpAnalyzer {
         double bestAngle = 0;
 
         // Search in a 180-degree span (±90 degrees from the opposite direction)
-        int angleSteps = 18; // Check every 10 degrees (180 degrees / 18 = 10 degrees per step)
+        int angleSteps = 72; // Check every 10 degrees (180 degrees / 18 = 10 degrees per step)
 
         for (int angleStep = 0; angleStep < angleSteps; angleStep++) {
             // Calculate angle offset from -90 to +90 degrees
