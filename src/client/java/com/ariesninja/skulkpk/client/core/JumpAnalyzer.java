@@ -84,8 +84,39 @@ public class JumpAnalyzer {
     private static boolean isWalkableSurface(World world, BlockPos pos) {
         // Check if the block below is solid and the block at pos and above are passable
         return world.getBlockState(pos.down()).isSolidBlock(world, pos.down()) &&
-               !world.getBlockState(pos).isSolidBlock(world, pos) &&
-               !world.getBlockState(pos.up()).isSolidBlock(world, pos.up());
+                !world.getBlockState(pos).isSolidBlock(world, pos) &&
+                !world.getBlockState(pos.up()).isSolidBlock(world, pos.up());
+    }
+
+    private static boolean isWalkableSurfaceEnhanced(World world, BlockPos pos) {
+        // Check if the player can stand anywhere within 0.3 blocks of the given position
+        // This accounts for the fact that players can stand near block edges
+
+        // Check a 0.6x0.6 region (±0.3 blocks) around the position at 0.05 block intervals
+        for (double offsetX = -0.3; offsetX <= 0.3; offsetX += 0.05) {
+            for (double offsetZ = -0.3; offsetZ <= 0.3; offsetZ += 0.05) {
+                // Calculate the actual position to check
+                double checkX = pos.getX() + 0.5 + offsetX; // Center of block + offset
+                double checkZ = pos.getZ() + 0.5 + offsetZ; // Center of block + offset
+
+                BlockPos checkPos = BlockPos.ofFloored(checkX, pos.getY(), checkZ);
+
+                // Check if this specific position is walkable:
+                // - Block below must be solid (to stand on)
+                // - Block at position must be passable (air/non-solid)
+                // - Block above must be passable (head room)
+                if (world.getBlockState(checkPos.down()).isSolidBlock(world, checkPos.down()) &&
+                        !world.getBlockState(checkPos).isSolidBlock(world, checkPos) &&
+                        !world.getBlockState(checkPos.up()).isSolidBlock(world, checkPos.up())) {
+
+                    // Found at least one valid standing position within the region
+                    return true;
+                }
+            }
+        }
+
+        // No valid standing position found within the 0.3-block region
+        return false;
     }
 
     private static boolean canReachWithoutJumping(World world, BlockPos start, BlockPos end) {
@@ -327,7 +358,7 @@ public class JumpAnalyzer {
 
             BlockPos checkPos = new BlockPos(x, y, z);
             if (world.getBlockState(checkPos).isSolidBlock(world, checkPos) ||
-                world.getBlockState(checkPos.up()).isSolidBlock(world, checkPos.up())) {
+                    world.getBlockState(checkPos.up()).isSolidBlock(world, checkPos.up())) {
                 return false;
             }
         }
@@ -460,9 +491,9 @@ public class JumpAnalyzer {
     private static BlockPos findMomentumStartPosition(World world, BlockPos jumpFrom, BlockPos target) {
         // Calculate the direction from jumpFrom to target
         Vec3d jumpToTarget = new Vec3d(
-            target.getX() - jumpFrom.getX(),
-            0, // Only consider horizontal direction for momentum
-            target.getZ() - jumpFrom.getZ()
+                target.getX() - jumpFrom.getX(),
+                0, // Only consider horizontal direction for momentum
+                target.getZ() - jumpFrom.getZ()
         ).normalize();
 
         // Calculate the base opposite direction (180 degrees) for momentum building
@@ -477,7 +508,7 @@ public class JumpAnalyzer {
         double bestAngle = 0;
 
         // Search in a 180-degree span (±90 degrees from the opposite direction)
-        int angleSteps = 72; // Check every 10 degrees (180 degrees / 18 = 10 degrees per step)
+        int angleSteps = 90; // Interval = 360 / angleSteps
 
         for (int angleStep = 0; angleStep < angleSteps; angleStep++) {
             // Calculate angle offset from -90 to +90 degrees
@@ -488,14 +519,14 @@ public class JumpAnalyzer {
             double sin = Math.sin(angleOffset);
 
             Vec3d momentumDirection = new Vec3d(
-                baseOppositeDirection.x * cos - baseOppositeDirection.z * sin,
-                0,
-                baseOppositeDirection.x * sin + baseOppositeDirection.z * cos
+                    baseOppositeDirection.x * cos - baseOppositeDirection.z * sin,
+                    0,
+                    baseOppositeDirection.x * sin + baseOppositeDirection.z * cos
             );
 
-            if (angleStep % 6 == 0) { // Log every 60 degrees
+            if (angleStep % 1 == 0) { // Log every 6 steps for performance
                 System.out.println("Checking angle " + Math.toDegrees(angleOffset) + "°: direction (" +
-                    String.format("%.2f, %.2f", momentumDirection.x, momentumDirection.z) + ")");
+                        String.format("%.2f, %.2f", momentumDirection.x, momentumDirection.z) + ")");
             }
 
             // Search for the longest straight line in this momentum direction
@@ -503,7 +534,7 @@ public class JumpAnalyzer {
             BlockPos currentBestStart = jumpFrom;
 
             // Test different distances along this momentum direction with finer granularity
-            for (double distance = 0.5; distance <= 20; distance += 0.5) {
+            for (double distance = 0.1; distance <= 20; distance += 0.1) {
                 // Calculate position at this distance
                 double x = jumpFrom.getX() + momentumDirection.x * distance;
                 double z = jumpFrom.getZ() + momentumDirection.z * distance;
@@ -514,10 +545,10 @@ public class JumpAnalyzer {
                 if (candidatePos.equals(currentBestStart)) continue;
 
                 // Check if this position is walkable
-                if (!isWalkableSurface(world, candidatePos)) {
+                if (!isWalkableSurfaceEnhanced(world, candidatePos)) {
                     // Try one block up in case there's a step
                     BlockPos upperPos = candidatePos.up();
-                    if (isWalkableSurface(world, upperPos)) {
+                    if (isWalkableSurfaceEnhanced(world, upperPos)) {
                         candidatePos = upperPos;
                     } else {
                         // Hit an obstacle, stop searching in this direction
@@ -525,14 +556,17 @@ public class JumpAnalyzer {
                     }
                 }
 
-                // Check if we can walk from jumpFrom to this position in a straight line
-                if (hasDirectPath(world, jumpFrom, candidatePos)) {
-                    currentBestStart = candidatePos;
-                    currentMomentumDistance = (int) Math.round(distance);
-                } else {
-                    // Path is blocked, stop searching
-                    break;
-                }
+                currentBestStart = candidatePos;
+                currentMomentumDistance = (int) Math.round(distance);
+
+//                // Check if we can walk from jumpFrom to this position in a straight line
+//                if (hasDirectPath(world, jumpFrom, candidatePos)) {
+//                    currentBestStart = candidatePos;
+//                    currentMomentumDistance = (int) Math.round(distance);
+//                } else {
+//                    // Path is blocked, stop searching
+//                    break;
+//                }
             }
 
             // Check if this direction gave us a better momentum path
@@ -541,14 +575,14 @@ public class JumpAnalyzer {
                 bestMomentumStart = currentBestStart;
                 bestAngle = Math.toDegrees(angleOffset);
                 System.out.println("New best momentum path: " + currentMomentumDistance + " blocks at " +
-                    String.format("%.1f°", bestAngle) + " to " + currentBestStart);
+                        String.format("%.1f°", bestAngle) + " to " + currentBestStart);
             }
         }
 
         // Only return a momentum start if we found at least 2 blocks of runway
         if (maxMomentumDistance >= 2) {
             System.out.println("Momentum analysis complete: Found " + maxMomentumDistance + " blocks of runway at " +
-                String.format("%.1f°", bestAngle) + " angle");
+                    String.format("%.1f°", bestAngle) + " angle");
             System.out.println("Best momentum start: " + bestMomentumStart);
             return bestMomentumStart;
         } else {
