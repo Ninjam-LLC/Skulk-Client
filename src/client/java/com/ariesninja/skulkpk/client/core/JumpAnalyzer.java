@@ -606,7 +606,7 @@ public class JumpAnalyzer {
             System.out.println("Best momentum start: " + String.format("(%.2f, %.0f, %.2f)", bestMomentumStart.x, bestMomentumStart.y, bestMomentumStart.z));
 
             // Set the precise momentum point (don't round it)
-            momentumPoint = bestMomentumStart;
+            momentumPoint = bestMomentumStart.add(0.0, 0.5, 0.0); // Centered at the block edge
 
             // Convert back to BlockPos for compatibility with existing code
             return BlockPos.ofFloored(bestMomentumStart.x, bestMomentumStart.y, bestMomentumStart.z);
@@ -656,19 +656,56 @@ public class JumpAnalyzer {
     private static Vec3d calculateJumpPoint(BlockPos jumpFrom, BlockPos target) {
         // Calculate the precise jump point: 0.3 blocks past the jumpFromBlock edge toward the target
 
+        // Get the momentum direction (from momentum start to jump block center)
+        Vec3d momentumPoint = getMomentumPoint();
+        Vec3d jumpFromCenter = new Vec3d(jumpFrom.getX() + 0.5, jumpFrom.getY(), jumpFrom.getZ() + 0.5);
+
+        Vec3d momentumDirection = null;
+        if (momentumPoint != null) {
+            momentumDirection = jumpFromCenter.subtract(momentumPoint).normalize();
+        }
+
         // Calculate the direction vector from jumpFrom to target
-        Vec3d direction = new Vec3d(
+        Vec3d targetDirection = new Vec3d(
                 target.getX() - jumpFrom.getX(),
                 0, // Ignore vertical component for jump point calculation
                 target.getZ() - jumpFrom.getZ()
         ).normalize();
 
-        // Calculate the precise jump point position
-        Vec3d jumpPoint = new Vec3d(
-                jumpFrom.getX() + 0.5 + direction.x * 0.3,
-                jumpFrom.getY() + 0.3, // Raise slightly to avoid clipping
-                jumpFrom.getZ() + 0.5 + direction.z * 0.3
-        );
+        // Calculate the jump point position
+        Vec3d jumpPoint;
+
+        if (momentumDirection != null) {
+            // Calculate the angle between momentum direction and target direction
+            double dotProduct = momentumDirection.x * targetDirection.x + momentumDirection.z * targetDirection.z;
+            // Clamp dot product to avoid numerical errors with acos
+            dotProduct = Math.max(-1.0, Math.min(1.0, dotProduct));
+            double theta = Math.acos(dotProduct);
+
+            // We want to go 0.3 blocks past the edge in the target direction
+            // From block center, we need to go 0.5 blocks to reach the edge, then 0.3 more
+            // Total distance in target direction: 0.8 blocks
+            double distanceInTargetDirection = 0.8;
+
+            // Calculate distance in momentum direction using trigonometry
+            // If theta is 0 (same direction), we go 0.8 in momentum direction
+            // If theta is 90° (perpendicular), we go 0 in momentum direction
+            double distanceInMomentumDirection = distanceInTargetDirection * Math.cos(theta);
+
+            // Calculate the jump point using both components
+            jumpPoint = new Vec3d(
+                    jumpFromCenter.x + targetDirection.x * distanceInTargetDirection + momentumDirection.x * (distanceInMomentumDirection - distanceInTargetDirection),
+                    jumpFrom.getY() + 0.5, // Keep at block center height
+                    jumpFromCenter.z + targetDirection.z * distanceInTargetDirection + momentumDirection.z * (distanceInMomentumDirection - distanceInTargetDirection)
+            );
+        } else {
+            // Fallback: no momentum direction available, just go 0.8 blocks in target direction
+            jumpPoint = new Vec3d(
+                    jumpFromCenter.x + targetDirection.x * 0.8,
+                    jumpFrom.getY() + 0.5,
+                    jumpFromCenter.z + targetDirection.z * 0.8
+            );
+        }
 
         return jumpPoint;
     }
