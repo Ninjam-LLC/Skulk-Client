@@ -19,6 +19,10 @@ public class JumpAnalyzer {
     private static BlockPos optimizedTargetBlock = null;
     private static BlockPos momentumStartBlock = null;
 
+    // Fine-grained position variables for precise jump calculations
+    private static Vec3d jumpPoint = null; // Precise jump position (0.3 blocks past jumpFromBlock edge)
+    private static Vec3d momentumPoint = null; // Precise momentum start position
+
     public static void analyzeJump(BlockPos target) {
         MinecraftClient client = MinecraftClient.getInstance();
         PlayerEntity player = client.player;
@@ -38,6 +42,11 @@ public class JumpAnalyzer {
         // Find the optimal momentum starting position (only if we have valid jump points)
         if (jumpFromBlock != null && optimizedTargetBlock != null) {
             momentumStartBlock = findMomentumStartPosition(world, jumpFromBlock, optimizedTargetBlock);
+
+            // Calculate precise jump point (0.3 blocks past jumpFromBlock edge toward target)
+            if (jumpFromBlock != null && optimizedTargetBlock != null) {
+                jumpPoint = calculateJumpPoint(jumpFromBlock, optimizedTargetBlock);
+            }
         }
     }
 
@@ -383,6 +392,15 @@ public class JumpAnalyzer {
         return momentumStartBlock;
     }
 
+    // Getters for fine-grained positions
+    public static Vec3d getJumpPoint() {
+        return jumpPoint;
+    }
+
+    public static Vec3d getMomentumPoint() {
+        return momentumPoint;
+    }
+
     private static boolean isConnectedByWalking(World world, BlockPos start, BlockPos target) {
         // Check if we can reach the target by just walking and climbing single blocks (no jumping required)
         // This uses a simple BFS to see if there's a walking path
@@ -491,6 +509,8 @@ public class JumpAnalyzer {
         jumpFromBlock = null;
         currentStandingBlock = null;
         momentumStartBlock = null;
+        jumpPoint = null;
+        momentumPoint = null;
     }
 
     private static BlockPos findMomentumStartPosition(World world, BlockPos jumpFrom, BlockPos target) {
@@ -584,10 +604,15 @@ public class JumpAnalyzer {
             System.out.println("Momentum analysis complete: Found " + String.format("%.2f", maxMomentumDistance) + " blocks of runway at " +
                     String.format("%.1f°", bestAngle) + " angle");
             System.out.println("Best momentum start: " + String.format("(%.2f, %.0f, %.2f)", bestMomentumStart.x, bestMomentumStart.y, bestMomentumStart.z));
+
+            // Set the precise momentum point (don't round it)
+            momentumPoint = bestMomentumStart;
+
             // Convert back to BlockPos for compatibility with existing code
             return BlockPos.ofFloored(bestMomentumStart.x, bestMomentumStart.y, bestMomentumStart.z);
         } else {
             System.out.println("Momentum analysis complete: Insufficient runway (" + String.format("%.2f", maxMomentumDistance) + " blocks, need 0.5+)");
+            momentumPoint = null;
             return null;
         }
     }
@@ -626,5 +651,25 @@ public class JumpAnalyzer {
         }
 
         return true;
+    }
+
+    private static Vec3d calculateJumpPoint(BlockPos jumpFrom, BlockPos target) {
+        // Calculate the precise jump point: 0.3 blocks past the jumpFromBlock edge toward the target
+
+        // Calculate the direction vector from jumpFrom to target
+        Vec3d direction = new Vec3d(
+                target.getX() - jumpFrom.getX(),
+                0, // Ignore vertical component for jump point calculation
+                target.getZ() - jumpFrom.getZ()
+        ).normalize();
+
+        // Calculate the precise jump point position
+        Vec3d jumpPoint = new Vec3d(
+                jumpFrom.getX() + 0.5 + direction.x * 0.3,
+                jumpFrom.getY() + 0.3, // Raise slightly to avoid clipping
+                jumpFrom.getZ() + 0.5 + direction.z * 0.3
+        );
+
+        return jumpPoint;
     }
 }

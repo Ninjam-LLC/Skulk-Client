@@ -11,6 +11,7 @@ import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3d;
 import org.joml.Matrix4f;
 
 import java.util.OptionalDouble;
@@ -86,7 +87,8 @@ public class SelectionRenderer {
                 // Render the momentum path in yellow
                 BlockPos momentumStartBlock = JumpAnalyzer.getMomentumStartBlock();
                 if (momentumStartBlock != null && jumpFromBlock != null) {
-                    drawMomentumPath(momentumStartBlock, jumpFromBlock, 1.0F, 1.0F, 0F, matrixStack, immediate, camera);
+                    // Use fine-grained positions if available, otherwise fall back to block positions
+                    drawMomentumPath(matrixStack, immediate, camera);
                 }
             }
         });
@@ -141,36 +143,49 @@ public class SelectionRenderer {
         vertices.vertex(matrix, minX, maxY, maxZ).color(r, g, b, a).normal(0, 1, 0);
     }
 
-    private static void drawMomentumPath(BlockPos start, BlockPos end, float r, float g, float b, MatrixStack matrixStack, VertexConsumerProvider.Immediate immediate, Camera camera) {
+    private static void drawMomentumPath(MatrixStack matrixStack, VertexConsumerProvider.Immediate immediate, Camera camera) {
         matrixStack.push();
         matrixStack.translate(-camera.getPos().x, -camera.getPos().y, -camera.getPos().z);
 
         VertexConsumer vertexConsumer = immediate.getBuffer(LINES_NO_DEPTH);
         Matrix4f matrix = matrixStack.peek().getPositionMatrix();
 
-        // Calculate the center points of each block for the line
-        float startX = start.getX() + 0.5f;
-        float startY = start.getY() + 0.5f;
-        float startZ = start.getZ() + 0.5f;
+        // Use fine-grained positions if available, otherwise fall back to block positions
+        Vec3d startPos = JumpAnalyzer.getMomentumPoint();
+        Vec3d endPos = JumpAnalyzer.getJumpPoint();
 
-        float endX = end.getX() + 0.5f;
-        float endY = end.getY() + 0.5f;
-        float endZ = end.getZ() + 0.5f;
+        if (startPos != null && endPos != null) {
+            // Use precise Vec3d positions for the momentum line
+            float startX = (float) startPos.x;
+            float startY = (float) startPos.y;
+            float startZ = (float) startPos.z;
 
-        // Draw a thick line by drawing multiple parallel lines
-        float thickness = 0.1f;
+            float endX = (float) endPos.x;
+            float endY = (float) endPos.y;
+            float endZ = (float) endPos.z;
 
-        // Draw main line
-        vertexConsumer.vertex(matrix, startX, startY, startZ).color(r, g, b, 1.0f).normal(0, 1, 0);
-        vertexConsumer.vertex(matrix, endX, endY, endZ).color(r, g, b, 1.0f).normal(0, 1, 0);
+            // Draw the precise momentum line in yellow
+            vertexConsumer.vertex(matrix, startX, startY, startZ).color(1.0f, 1.0f, 0F, 1.0f).normal(0, 1, 0);
+            vertexConsumer.vertex(matrix, endX, endY, endZ).color(1.0f, 1.0f, 0F, 1.0f).normal(0, 1, 0);
+        } else {
+            // Fall back to block positions if fine-grained positions are not available
+            BlockPos startBlock = JumpAnalyzer.getMomentumStartBlock();
+            BlockPos endBlock = JumpAnalyzer.getJumpFromBlock();
 
-        // Draw additional lines for thickness (offset slightly)
-        for (int i = 0; i < 4; i++) {
-            float offsetX = (i % 2 == 0 ? thickness : -thickness);
-            float offsetZ = (i < 2 ? thickness : -thickness);
+            if (startBlock != null && endBlock != null) {
+                // Use block center positions as fallback
+                float startX = startBlock.getX() + 0.5f;
+                float startY = startBlock.getY() + 0.5f;
+                float startZ = startBlock.getZ() + 0.5f;
 
-            vertexConsumer.vertex(matrix, startX + offsetX, startY, startZ + offsetZ).color(r, g, b, 1.0f).normal(0, 1, 0);
-            vertexConsumer.vertex(matrix, endX + offsetX, endY, endZ + offsetZ).color(r, g, b, 1.0f).normal(0, 1, 0);
+                float endX = endBlock.getX() + 0.5f;
+                float endY = endBlock.getY() + 0.5f;
+                float endZ = endBlock.getZ() + 0.5f;
+
+                // Draw the fallback momentum line in yellow
+                vertexConsumer.vertex(matrix, startX, startY, startZ).color(1.0f, 1.0f, 0F, 1.0f).normal(0, 1, 0);
+                vertexConsumer.vertex(matrix, endX, endY, endZ).color(1.0f, 1.0f, 0F, 1.0f).normal(0, 1, 0);
+            }
         }
 
         immediate.draw(LINES_NO_DEPTH);
