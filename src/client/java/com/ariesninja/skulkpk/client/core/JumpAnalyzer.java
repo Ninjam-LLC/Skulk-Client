@@ -60,6 +60,16 @@ public class JumpAnalyzer {
         Vec3d playerPos = player.getPos();
         BlockPos playerBlock = BlockPos.ofFloored(playerPos);
 
+        // Check if the initial player block is walkable, if not find the nearest walkable block
+        if (!isWalkableSurface(world, playerBlock)) {
+            // Find the nearest walkable block around the player's position
+            playerBlock = findNearestWalkableBlock(world, playerBlock);
+            if (playerBlock == null) {
+                // No walkable block found nearby, return null
+                return null;
+            }
+        }
+
         // Search in expanding radius around player
         int maxRadius = 10; // Search within 10 blocks
         double closestDistance = Double.MAX_VALUE;
@@ -89,6 +99,31 @@ public class JumpAnalyzer {
         }
 
         return closestBlock;
+    }
+
+    private static BlockPos findNearestWalkableBlock(World world, BlockPos startPos) {
+        // Search in expanding radius to find the nearest walkable block
+        int maxRadius = 2; // Search within 3 blocks of the starting position
+
+        for (int radius = 0; radius <= maxRadius; radius++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dy = -1; dy <= 1; dy++) { // Check one block up and down as well
+                    for (int dz = -radius; dz <= radius; dz++) {
+                        // Only check the perimeter of current radius (except for radius 0)
+                        if (radius > 0 && Math.abs(dx) != radius && Math.abs(dz) != radius) continue;
+
+                        BlockPos checkPos = startPos.add(dx, dy, dz);
+
+                        if (isWalkableSurface(world, checkPos)) {
+                            return checkPos;
+                        }
+                    }
+                }
+            }
+        }
+
+        // No walkable block found
+        return null;
     }
 
     private static boolean isWalkableSurface(World world, BlockPos pos) {
