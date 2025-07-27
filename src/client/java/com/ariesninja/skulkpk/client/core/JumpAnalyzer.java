@@ -6,6 +6,7 @@ import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Position;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
@@ -378,6 +379,10 @@ public class JumpAnalyzer {
         return optimizedTargetBlock;
     }
 
+    public static BlockPos getMomentumStartBlock() {
+        return momentumStartBlock;
+    }
+
     private static boolean isConnectedByWalking(World world, BlockPos start, BlockPos target) {
         // Check if we can reach the target by just walking and climbing single blocks (no jumping required)
         // This uses a simple BFS to see if there's a walking path
@@ -456,9 +461,9 @@ public class JumpAnalyzer {
         // Walking rules:
         // - Can go up 1 block (climbing/stepping up)
         // - Can stay at same level
-        // - Can fall down up to 19 blocks
+        // - Can fall down up to 3 blocks
         if (dy > 1) return false;  // Can't go up more than 1 block
-        if (dy < -19) return false;  // Can't fall more than 19 blocks
+        if (dy < -3) return false;  // Can't fall more than 3 blocks
 
         return true;
     }
@@ -503,8 +508,8 @@ public class JumpAnalyzer {
         System.out.println("Jump from: " + jumpFrom + " to target: " + target);
         System.out.println("Base momentum direction: " + String.format("(%.2f, %.2f)", baseOppositeDirection.x, baseOppositeDirection.z));
 
-        BlockPos bestMomentumStart = null;
-        int maxMomentumDistance = 0;
+        Vec3d bestMomentumStart = null;
+        double maxMomentumDistance = 0;
         double bestAngle = 0;
 
         // Search in a 180-degree span (±90 degrees from the opposite direction)
@@ -524,49 +529,44 @@ public class JumpAnalyzer {
                     baseOppositeDirection.x * sin + baseOppositeDirection.z * cos
             );
 
-            if (angleStep % 1 == 0) { // Log every 6 steps for performance
+            if (angleStep % 15 == 0) { // Log every 15 steps for performance
                 System.out.println("Checking angle " + Math.toDegrees(angleOffset) + "°: direction (" +
-                        String.format("%.2f, %.2f", momentumDirection.x, momentumDirection.z) + ")");
+                        String.format("%.2f, %.2f)", momentumDirection.x, momentumDirection.z) + ")");
             }
 
             // Search for the longest straight line in this momentum direction
-            int currentMomentumDistance = 0;
-            BlockPos currentBestStart = jumpFrom;
+            double currentMomentumDistance = 0;
+            Vec3d currentBestStart = new Vec3d(jumpFrom.getX() + 0.5, jumpFrom.getY(), jumpFrom.getZ() + 0.5);
+            int currentY = jumpFrom.getY(); // Track Y level to prevent uphill paths
 
             // Test different distances along this momentum direction with finer granularity
             for (double distance = 0.1; distance <= 20; distance += 0.1) {
-                // Calculate position at this distance
-                double x = jumpFrom.getX() + momentumDirection.x * distance;
-                double z = jumpFrom.getZ() + momentumDirection.z * distance;
+                // Calculate position at this distance using fine-grained coordinates
+                double x = jumpFrom.getX() + 0.5 + momentumDirection.x * distance;
+                double z = jumpFrom.getZ() + 0.5 + momentumDirection.z * distance;
 
-                BlockPos candidatePos = new BlockPos((int) Math.round(x), jumpFrom.getY(), (int) Math.round(z));
+                Vec3d candidatePos = new Vec3d(x, currentY, z);
 
-                // Skip if we've already checked this exact position in this direction
-                if (candidatePos.equals(currentBestStart)) continue;
+                // Skip if we haven't moved significantly from the last position
+                if (candidatePos.distanceTo(currentBestStart) < 0.05) continue;
 
-                // Check if this position is walkable
-                if (!isWalkableSurfaceEnhanced(world, candidatePos)) {
+                // Check if this position is walkable using block coordinates for world checks
+                BlockPos blockPos = BlockPos.ofFloored(candidatePos.x, candidatePos.y, candidatePos.z);
+                if (!isWalkableSurfaceEnhanced(world, blockPos)) {
                     // Try one block up in case there's a step
-                    BlockPos upperPos = candidatePos.up();
+                    BlockPos upperPos = blockPos.up();
                     if (isWalkableSurfaceEnhanced(world, upperPos)) {
-                        candidatePos = upperPos;
+                        // If the upper position is walkable, use that Y level
+                        currentY = upperPos.getY();
+                        candidatePos = new Vec3d(candidatePos.x, currentY, candidatePos.z);
                     } else {
-                        // Hit an obstacle, stop searching in this direction
                         break;
                     }
                 }
 
+                // Path is clear, update our best momentum position
                 currentBestStart = candidatePos;
-                currentMomentumDistance = (int) Math.round(distance);
-
-//                // Check if we can walk from jumpFrom to this position in a straight line
-//                if (hasDirectPath(world, jumpFrom, candidatePos)) {
-//                    currentBestStart = candidatePos;
-//                    currentMomentumDistance = (int) Math.round(distance);
-//                } else {
-//                    // Path is blocked, stop searching
-//                    break;
-//                }
+                currentMomentumDistance = distance;
             }
 
             // Check if this direction gave us a better momentum path
@@ -574,47 +574,50 @@ public class JumpAnalyzer {
                 maxMomentumDistance = currentMomentumDistance;
                 bestMomentumStart = currentBestStart;
                 bestAngle = Math.toDegrees(angleOffset);
-                System.out.println("New best momentum path: " + currentMomentumDistance + " blocks at " +
-                        String.format("%.1f°", bestAngle) + " to " + currentBestStart);
+                System.out.println("New best momentum path: " + String.format("%.2f", currentMomentumDistance) + " blocks at " +
+                        String.format("%.1f°", bestAngle) + " to " + String.format("(%.2f, %.0f, %.2f)", currentBestStart.x, currentBestStart.y, currentBestStart.z));
             }
         }
 
-        // Only return a momentum start if we found at least 2 blocks of runway
-        if (maxMomentumDistance >= 2) {
-            System.out.println("Momentum analysis complete: Found " + maxMomentumDistance + " blocks of runway at " +
+        // Only return a momentum start if we found at least 0.5 blocks of runway
+        if (maxMomentumDistance >= 0.5) {
+            System.out.println("Momentum analysis complete: Found " + String.format("%.2f", maxMomentumDistance) + " blocks of runway at " +
                     String.format("%.1f°", bestAngle) + " angle");
-            System.out.println("Best momentum start: " + bestMomentumStart);
-            return bestMomentumStart;
+            System.out.println("Best momentum start: " + String.format("(%.2f, %.0f, %.2f)", bestMomentumStart.x, bestMomentumStart.y, bestMomentumStart.z));
+            // Convert back to BlockPos for compatibility with existing code
+            return BlockPos.ofFloored(bestMomentumStart.x, bestMomentumStart.y, bestMomentumStart.z);
         } else {
-            System.out.println("Momentum analysis complete: Insufficient runway (" + maxMomentumDistance + " blocks, need 2+)");
+            System.out.println("Momentum analysis complete: Insufficient runway (" + String.format("%.2f", maxMomentumDistance) + " blocks, need 0.5+)");
             return null;
         }
     }
 
-    private static boolean hasDirectPath(World world, BlockPos start, BlockPos end) {
-        // Check if there's a clear straight path between start and end
-        int dx = end.getX() - start.getX();
-        int dz = end.getZ() - start.getZ();
-        int steps = Math.max(Math.abs(dx), Math.abs(dz));
+    private static boolean hasDirectPathVec3d(World world, Vec3d start, Vec3d end) {
+        // Check if there's a clear straight path between start and end using fine-grained coordinates
+        // Uses enhanced walkable surface detection that accounts for 0.3 block buffer
+        double dx = end.x - start.x;
+        double dz = end.z - start.z;
+        double distance = Math.sqrt(dx * dx + dz * dz);
+        int steps = (int) Math.ceil(distance * 4); // 4 checks per block for fine granularity
 
         if (steps == 0) return true;
 
-        double stepX = (double) dx / steps;
-        double stepZ = (double) dz / steps;
+        double stepX = dx / steps;
+        double stepZ = dz / steps;
 
         for (int i = 0; i <= steps; i++) {
-            int x = start.getX() + (int) Math.round(i * stepX);
-            int z = start.getZ() + (int) Math.round(i * stepZ);
+            double x = start.x + i * stepX;
+            double z = start.z + i * stepZ;
 
-            // Check at the same Y level first
-            BlockPos checkPos = new BlockPos(x, start.getY(), z);
-            if (isWalkableSurface(world, checkPos)) {
+            // Check at the same Y level first using enhanced detection
+            BlockPos checkPos = BlockPos.ofFloored(x, start.y, z);
+            if (isWalkableSurfaceEnhanced(world, checkPos)) {
                 continue;
             }
 
             // Try one block up if current level is blocked
             BlockPos upperPos = checkPos.up();
-            if (isWalkableSurface(world, upperPos)) {
+            if (isWalkableSurfaceEnhanced(world, upperPos)) {
                 continue;
             }
 
@@ -623,9 +626,5 @@ public class JumpAnalyzer {
         }
 
         return true;
-    }
-
-    public static BlockPos getMomentumStartBlock() {
-        return momentumStartBlock;
     }
 }
