@@ -1,12 +1,13 @@
 package com.ariesninja.skulkpk.client.core;
 
 import com.ariesninja.skulkpk.client.core.rendering.SelectionRenderer;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.LadderBlock;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Position;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 
@@ -128,44 +129,15 @@ public class JumpAnalyzer {
 
     private static boolean isWalkableSurface(World world, BlockPos pos) {
         // Check if the block below is solid and the block at pos and above are passable
-        return world.getBlockState(pos.down()).isSolidBlock(world, pos.down()) &&
+        // OR if the current position has a ladder (can climb ladders)
+        return (world.getBlockState(pos.down()).isSolidBlock(world, pos.down()) &&
                 !world.getBlockState(pos).isSolidBlock(world, pos) &&
-                !world.getBlockState(pos.up()).isSolidBlock(world, pos.up());
-    }
-
-    private static boolean isWalkableSurfaceEnhanced(World world, BlockPos pos) {
-        // Check if the player can stand anywhere within 0.3 blocks of the given position
-        // This accounts for the fact that players can stand near block edges
-
-        // Check a 0.6x0.6 region (±0.3 blocks) around the position at 0.05 block intervals
-        for (double offsetX = -0.3; offsetX <= 0.3; offsetX += 0.05) {
-            for (double offsetZ = -0.3; offsetZ <= 0.3; offsetZ += 0.05) {
-                // Calculate the actual position to check
-                double checkX = pos.getX() + 0.5 + offsetX; // Center of block + offset
-                double checkZ = pos.getZ() + 0.5 + offsetZ; // Center of block + offset
-
-                BlockPos checkPos = BlockPos.ofFloored(checkX, pos.getY(), checkZ);
-
-                // Check if this specific position is walkable:
-                // - Block below must be solid (to stand on)
-                // - Block at position must be passable (air/non-solid)
-                // - Block above must be passable (head room)
-                if (world.getBlockState(checkPos.down()).isSolidBlock(world, checkPos.down()) &&
-                        !world.getBlockState(checkPos).isSolidBlock(world, checkPos) &&
-                        !world.getBlockState(checkPos.up()).isSolidBlock(world, checkPos.up())) {
-
-                    // Found at least one valid standing position within the region
-                    return true;
-                }
-            }
-        }
-
-        // No valid standing position found within the 0.3-block region
-        return false;
+                !world.getBlockState(pos.up()).isSolidBlock(world, pos.up())) ||
+                isLadderClimbable(world, pos);
     }
 
     private static boolean canReachWithoutJumping(World world, BlockPos start, BlockPos end) {
-        // Simple check: can we walk there on the same Y level or going down?
+        // Simple check: can we walk there on the same Y level or using ladders/steps?
         // For now, just check if there's a clear horizontal path at the same Y level
 
         int dx = end.getX() - start.getX();
@@ -501,17 +473,38 @@ public class JumpAnalyzer {
 
     private static boolean canWalkStep(World world, BlockPos from, BlockPos to) {
         // Check if we can walk/climb/fall from 'from' to 'to' without jumping
+        // Now includes ladder climbing support
         int dx = Math.abs(to.getX() - from.getX());
         int dz = Math.abs(to.getZ() - from.getZ());
         int dy = to.getY() - from.getY();
 
-        // Must be adjacent horizontally
+        // Must be adjacent horizontally or vertically aligned for ladder climbing
         if (dx > 1 || dz > 1) return false;
 
+        // Special case: ladder climbing
+        if (isLadderClimbable(world, from) && isLadderClimbable(world, to)) {
+            return canClimbLadder(world, from, to);
+        }
+
+        // If either position is a ladder but we can't climb between them,
+        // check if we can still use normal movement rules
+        if (isLadderClimbable(world, from) || isLadderClimbable(world, to)) {
+            // Allow transitioning from/to ladders with more flexible height rules
+            // Can go up to 2 blocks when involving ladders (climbing on/off)
+            if (dy > 2) return false;
+            if (dy < -10) return false; // Can fall further from ladders
+
+            // Can't move diagonally when transitioning to/from ladders if going up
+            if ((dx == 1 && dz == 1) && dy > 0) return false;
+
+            return true;
+        }
+
+        // Normal walking rules (no ladders involved):
         // Can't move diagonally AND up at the same time
         if ((dx == 1 && dz == 1) && dy > 0) return false;
 
-        // Walking rules:
+        // Standard walking rules:
         // - Can go up 1 block (climbing/stepping up)
         // - Can stay at same level
         // - Can fall down up to 3 blocks
@@ -743,5 +736,93 @@ public class JumpAnalyzer {
         }
 
         return jumpPoint;
+    }
+
+    private static boolean isWalkableSurfaceEnhanced(World world, BlockPos pos) {
+        // Check if the player can stand anywhere within 0.3 blocks of the given position
+        // This accounts for the fact that players can stand near block edges
+        // Also include ladder climbing positions
+
+        // First check if this is a ladder climbing position
+        if (isLadderClimbable(world, pos)) {
+            return true;
+        }
+
+        // Check a 0.6x0.6 region (±0.3 blocks) around the position at 0.05 block intervals
+        for (double offsetX = -0.3; offsetX <= 0.3; offsetX += 0.05) {
+            for (double offsetZ = -0.3; offsetZ <= 0.3; offsetZ += 0.05) {
+                // Calculate the actual position to check
+                double checkX = pos.getX() + 0.5 + offsetX; // Center of block + offset
+                double checkZ = pos.getZ() + 0.5 + offsetZ; // Center of block + offset
+
+                BlockPos checkPos = BlockPos.ofFloored(checkX, pos.getY(), checkZ);
+
+                // Check if this specific position is walkable:
+                // - Block below must be solid (to stand on)
+                // - Block at position must be passable (air/non-solid)
+                // - Block above must be passable (head room)
+                // - OR it's a ladder position
+                if ((world.getBlockState(checkPos.down()).isSolidBlock(world, checkPos.down()) &&
+                        !world.getBlockState(checkPos).isSolidBlock(world, checkPos) &&
+                        !world.getBlockState(checkPos.up()).isSolidBlock(world, checkPos.up())) ||
+                        isLadderClimbable(world, checkPos)) {
+
+                    // Found at least one valid standing position within the region
+                    return true;
+                }
+            }
+        }
+
+        // No valid standing position found within the 0.3-block region
+        return false;
+    }
+
+    // Helper method to detect if a position is climbable via ladder
+    private static boolean isLadderClimbable(World world, BlockPos pos) {
+        BlockState blockState = world.getBlockState(pos);
+
+        // Check if the current block is a ladder
+        if (blockState.getBlock() instanceof LadderBlock) {
+            // Ensure there's head room (block above is passable)
+            return !world.getBlockState(pos.up()).isSolidBlock(world, pos.up());
+        }
+
+        return false;
+    }
+
+    // Helper method to check if we can climb between two ladder positions
+    private static boolean canClimbLadder(World world, BlockPos from, BlockPos to) {
+        // Both positions must be ladder-climbable
+        if (!isLadderClimbable(world, from) || !isLadderClimbable(world, to)) {
+            return false;
+        }
+
+        int dy = to.getY() - from.getY();
+        int dx = Math.abs(to.getX() - from.getX());
+        int dz = Math.abs(to.getZ() - from.getZ());
+
+        // Must be vertically aligned or adjacent horizontally
+        if (dx > 1 || dz > 1) {
+            return false;
+        }
+
+        // Can climb up or down any reasonable distance on ladders
+        if (Math.abs(dy) > 10) { // Reasonable limit to prevent infinite climbing
+            return false;
+        }
+
+        // Check that there's a continuous ladder path (simplified check)
+        int steps = Math.abs(dy);
+        if (steps > 0) {
+            int stepY = dy > 0 ? 1 : -1;
+            for (int i = 1; i < steps; i++) {
+                BlockPos intermediatePos = from.add(0, i * stepY, 0);
+                if (!isLadderClimbable(world, intermediatePos)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 }
