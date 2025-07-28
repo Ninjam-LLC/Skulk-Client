@@ -4,13 +4,13 @@ import com.ariesninja.skulkpk.client.core.BlockSelector;
 import com.ariesninja.skulkpk.client.core.JumpAnalyzer;
 import me.x150.renderer.render.Renderer3d;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
-import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
 import java.awt.*;
+import java.util.Objects;
 
 public class SelectionRenderer {
 
@@ -35,14 +35,13 @@ public class SelectionRenderer {
             }
 
             BlockPos selectedBlock = BlockSelector.getSelectedBlock();
-            if (selectedBlock != null && context.consumers() instanceof VertexConsumerProvider.Immediate immediate) {
+            if (selectedBlock != null && context.consumers() instanceof VertexConsumerProvider.Immediate) {
                 MatrixStack matrixStack = context.matrixStack();
-                Camera camera = context.camera();
 
                 // Highlight the optimized target block in red (if available, otherwise use selected block)
                 BlockPos targetToHighlight = JumpAnalyzer.getOptimizedTargetBlock();
 
-                Renderer3d.renderEdged(matrixStack, new Color(255, 180, 180, 120), new Color(255, 0, 0), targetToHighlight.toCenterPos().add(-0.5, -0.5, -0.5), new Vec3d(1.0, 1.0, 1.0));
+                Renderer3d.renderEdged(Objects.requireNonNull(matrixStack), new Color(255, 180, 180, 120), new Color(255, 0, 0), targetToHighlight.toCenterPos().add(-0.5, -0.5, -0.5), new Vec3d(1.0, 1.0, 1.0));
 
                 // Highlight the jump-from block in blue
                 BlockPos jumpFromBlock = JumpAnalyzer.getJumpFromBlock();
