@@ -28,6 +28,18 @@ public class SelectionRenderer {
         Renderer3d.renderThroughWalls();
     }
 
+    /**
+     * Generates a rainbow color that cycles over time
+     *
+     * @return A Color object representing the current rainbow color
+     */
+    private static Color getRainbowColor() {
+        // Use system time to create a cycling effect (cycle every 3 seconds)
+        long time = System.currentTimeMillis();
+        float hue = (time % 3000) / 3000.0f; // Cycle through hue values 0-1 over 3 seconds
+        return Color.getHSBColor(hue, 1.0f, 1.0f); // Full saturation and brightness
+    }
+
     public static void register() {
         WorldRenderEvents.AFTER_ENTITIES.register(context -> {
             if (!highlightsVisible) {
@@ -49,11 +61,11 @@ public class SelectionRenderer {
                     Renderer3d.renderEdged(matrixStack, new Color(180, 180, 255, 120), new Color(0, 0, 255), jumpFromBlock.toCenterPos().add(-0.5, -0.5, -0.5), new Vec3d(1.0, 1.0, 1.0));
                 }
 
-                // Render the momentum path in yellow
+                // Render the momentum path in rainbow colors
                 Vec3d momentumPoint = JumpAnalyzer.getMomentumPoint();
                 Vec3d jumpPoint = JumpAnalyzer.getJumpPoint();
                 if (momentumPoint != null && jumpPoint != null) {
-                    Renderer3d.renderLine(matrixStack, new Color(255, 255, 0), momentumPoint, jumpPoint);
+                    Renderer3d.renderLine(matrixStack, getRainbowColor(), momentumPoint, jumpPoint);
                 }
             }
         });
