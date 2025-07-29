@@ -42,7 +42,7 @@ public class SkulkpkClient implements ClientModInitializer {
         }
 
         if (Keybinds.EXECUTE_KEY.wasPressed()) {
-            ActionQueue.addActions(JumpPlanner.planJump(BlockSelector.getSelectedBlock()));
+            // TODO
         }
 
         if (Keybinds.TEST_KEY_1.wasPressed()) {
