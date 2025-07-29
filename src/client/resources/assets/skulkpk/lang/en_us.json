@@ -1,5 +1,7 @@
 {
   "key.skulkpk.select": "Select Block",
-  "key.skulkpk.execute": "Execute Jump"
+  "key.skulkpk.execute": "Execute Jump",
+  "key.skulkpk.test": "TEST KEY (ROTATE HEADING)",
+  "key.skulkpk.test2": "TEST KEY (MOVE PLAYER)"
 }
 

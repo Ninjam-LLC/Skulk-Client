@@ -1,10 +1,6 @@
 package com.ariesninja.skulkpk.client;
 
-import com.ariesninja.skulkpk.client.core.ActionQueue;
-import com.ariesninja.skulkpk.client.core.BlockSelector;
-import com.ariesninja.skulkpk.client.core.JumpAnalyzer;
-import com.ariesninja.skulkpk.client.core.JumpPlanner;
-import com.ariesninja.skulkpk.client.core.Keybinds;
+import com.ariesninja.skulkpk.client.core.*;
 import com.ariesninja.skulkpk.client.core.rendering.SelectionRenderer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -48,5 +44,18 @@ public class SkulkpkClient implements ClientModInitializer {
         if (Keybinds.EXECUTE_KEY.wasPressed()) {
             ActionQueue.addActions(JumpPlanner.planJump(BlockSelector.getSelectedBlock()));
         }
+
+        if (Keybinds.TEST_KEY_1.wasPressed()) {
+            // This key can be used for testing purposes, e.g., to trigger a specific action or log information
+            PlayerController.cvmRotatePlayer(client);
+        }
+
+        if (Keybinds.TEST_KEY_2.wasPressed()) {
+            // This key can also be used for testing purposes
+            PlayerController.cvmMovePlayer(client);
+        }
+
+        // Call PlayerController.tick to handle any ongoing actions
+        PlayerController.tick(client);
     }
 }
