@@ -26,6 +26,15 @@ public class Keybinds {
             )
     );
 
+    public static final KeyBinding CLEAR_KEY = KeyBindingHelper.registerKeyBinding(
+            new KeyBinding(
+                    "key.skulkpk.clear",
+                    InputUtil.Type.KEYSYM,
+                    GLFW.GLFW_KEY_C,
+                    CATEGORY
+            )
+    );
+
     public static final KeyBinding TEST_KEY_1 = KeyBindingHelper.registerKeyBinding(
             new KeyBinding(
                     "key.skulkpk.test",
@@ -47,4 +56,4 @@ public class Keybinds {
     public static void register() {
         // This method is called to ensure the keybindings are registered.
     }
-} 
+}

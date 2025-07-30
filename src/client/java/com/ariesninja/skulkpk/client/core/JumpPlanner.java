@@ -1,7 +1,9 @@
 package com.ariesninja.skulkpk.client.core;
 
 import com.ariesninja.skulkpk.client.core.data.Step;
-import net.minecraft.util.math.BlockPos;
+import com.ariesninja.skulkpk.client.core.physics.Align;
+import com.ariesninja.skulkpk.client.core.physics.Momentum;
+import com.ariesninja.skulkpk.client.core.physics.Avoidance;
 import net.minecraft.util.math.Vec3d;
 
 import java.util.*;
@@ -12,8 +14,9 @@ public class JumpPlanner {
      * Represents the logistics data received from the Jump analyzer
      */
     public static class JumpLogistics {
-        private final BlockPos startPos;
-        private final BlockPos targetPos;
+        private final Vec3d momentumStartPos;
+        private final Vec3d jumpPos;
+        private final Vec3d targetPos;
         private final double distance;
         private final double heightDifference;
         private final boolean requiresSprint;
@@ -21,10 +24,11 @@ public class JumpPlanner {
         private final Vec3d recommendedDirection;
         private final Map<String, Object> additionalData;
 
-        public JumpLogistics(BlockPos startPos, BlockPos targetPos, double distance,
+        public JumpLogistics(Vec3d momentumStartPos, Vec3d jumpPos, Vec3d targetPos, double distance,
                              double heightDifference, boolean requiresSprint, boolean requiresJump,
                              Vec3d recommendedDirection) {
-            this.startPos = startPos;
+            this.momentumStartPos = momentumStartPos;
+            this.jumpPos = jumpPos;
             this.targetPos = targetPos;
             this.distance = distance;
             this.heightDifference = heightDifference;
@@ -35,8 +39,9 @@ public class JumpPlanner {
         }
 
         // Getters
-        public BlockPos getStartPos() { return startPos; }
-        public BlockPos getTargetPos() { return targetPos; }
+        public Vec3d getMomentumStartPos() { return momentumStartPos; }
+        public Vec3d getJumpPos() { return jumpPos; }
+        public Vec3d getTargetPos() { return targetPos; }
         public double getDistance() { return distance; }
         public double getHeightDifference() { return heightDifference; }
         public boolean requiresSprint() { return requiresSprint; }
@@ -77,8 +82,9 @@ public class JumpPlanner {
     public void observeLogistics(JumpLogistics logistics) {
         if (logistics != null) {
             pendingLogistics.offer(logistics);
-            System.out.println("JumpPlanner: Received logistics for jump from " +
-                    logistics.getStartPos() + " to " + logistics.getTargetPos());
+            System.out.println("JumpPlanner: Received logistics for jump from momentum start " +
+                    logistics.getMomentumStartPos() + " -> jump pos " + logistics.getJumpPos() +
+                    " -> target " + logistics.getTargetPos());
         }
     }
 
@@ -103,16 +109,31 @@ public class JumpPlanner {
     private StepSequence generateStepSequence(JumpLogistics logistics) {
         List<Step> steps = new ArrayList<>();
 
-        // TODO: Implement actual planning logic based on logistics
-        // For now, this is a placeholder structure showing how it would work
+        // Run physics-based checks to determine complexity
+        boolean requiresPreciseAlignment = Align.requiresPreciseAlignment(logistics);
+        boolean requiresAdvancedMomentum = Momentum.requiresAdvancedMomentum(logistics);
+        boolean requiresObstacleAvoidance = Avoidance.requiresObstacleAvoidance(logistics);
 
-        // Example basic sequence structure:
-        // 1. Rotate towards target if needed
-        // 2. Start sprinting if required
-        // 3. Move forward
-        // 4. Jump at the right time
-        // 5. Continue movement in air
-        // 6. Land and stop
+        System.out.println("JumpPlanner: Physics checks - Precise Alignment: " + requiresPreciseAlignment +
+                ", Advanced Momentum: " + requiresAdvancedMomentum +
+                ", Obstacle Avoidance: " + requiresObstacleAvoidance);
+
+        // For now, all physics checks return false, so we use the simple 3-step strategy
+        if (!requiresPreciseAlignment && !requiresAdvancedMomentum && !requiresObstacleAvoidance) {
+            // Use the simple 3-step rough jump strategy
+            steps.add(Step.roughStart());
+            steps.add(Step.roughMomentum());
+            steps.add(Step.roughJump());
+
+            System.out.println("JumpPlanner: Using simple 3-step rough jump strategy");
+        } else {
+            // TODO: Implement complex jump strategies for cases requiring:
+            // - Precise alignment
+            // - Advanced momentum calculations
+            // - Obstacle avoidance
+            System.out.println("JumpPlanner: Complex jump strategies not yet implemented");
+            return null;
+        }
 
         return new StepSequence(steps);
     }

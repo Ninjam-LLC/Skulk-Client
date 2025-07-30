@@ -44,4 +44,23 @@ public class BlockSelector {
     public static BlockPos getSelectedBlock() {
         return selectedBlock;
     }
+
+    public static void clearSelection() {
+        selectedBlock = null;
+        SelectionRenderer.hideAllHighlights();
+
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player != null) {
+            String prefix = "Skulk";
+            String arrow = " > ";
+            String message = "Selection cleared";
+
+            Text prefixText = Text.literal(prefix).formatted(Formatting.AQUA, Formatting.BOLD);
+            Text arrowText = Text.literal(arrow).formatted(Formatting.GRAY);
+            Text messageText = Text.literal(message).formatted(Formatting.YELLOW);
+
+            Text fullMessage = Text.empty().append(prefixText).append(arrowText).append(messageText);
+            client.player.sendMessage(fullMessage, false);
+        }
+    }
 }

@@ -1,4 +1,4 @@
 package com.ariesninja.skulkpk.client.core.physics;
 
-public class ObstructionClassification {
+public class Obstructions {
 }

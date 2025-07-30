@@ -18,7 +18,12 @@ public class Step {
         STOP_SNEAK,
         WAIT,
         MOVEMENT,  // Indicates this step uses MovementAction
-        ROTATION   // Indicates this step uses RotationAction
+        ROTATION,   // Indicates this step uses RotationAction
+
+        // Dynamic action types with stop conditions
+        ROUGH_START,    // Point camera toward momentum start, move forward until nearby, then shift move to precise position
+        ROUGH_MOMENTUM, // Sprint in direction of momentum line until within threshold of jump block
+        ROUGH_JUMP      // Jump while sprinting toward target block
     }
 
     /**
@@ -278,5 +283,18 @@ public class Step {
 
     public static Step wait(int duration) {
         return new Step(ActionType.WAIT, duration, WAIT_UNTIL_FINISHED);
+    }
+
+    // Factory methods for dynamic action types
+    public static Step roughStart() {
+        return new Step(ActionType.ROUGH_START, WAIT_UNTIL_FINISHED);
+    }
+
+    public static Step roughMomentum() {
+        return new Step(ActionType.ROUGH_MOMENTUM, WAIT_UNTIL_FINISHED);
+    }
+
+    public static Step roughJump() {
+        return new Step(ActionType.ROUGH_JUMP, WAIT_UNTIL_FINISHED);
     }
 }
