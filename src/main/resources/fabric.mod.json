@@ -20,7 +20,13 @@
       "com.ariesninja.skulkpk.Skulkpk"
     ]
   },
-  "mixins": [],
+  "mixins": [
+    "skulkpk.mixins.json",
+    {
+      "config": "skulkpk.client.mixins.json",
+      "environment": "client"
+    }
+  ],
   "depends": {
     "fabricloader": ">=${loader_version}",
     "fabric": "*",
