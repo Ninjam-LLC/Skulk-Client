@@ -13,7 +13,7 @@ public class PlayerController {
     private static int rotationTimer = 0;
     private static float startYaw = 0.0f;
     private static float targetYaw = 0.0f;
-    private static final int ROTATION_DURATION = 20; // 20 ticks (1 second at 20 TPS)
+    private static final int ROTATION_DURATION = 5; // 20 ticks (1 second at 20 TPS)
 
     // Step execution state
     private static Step currentStep = null;
@@ -322,7 +322,7 @@ public class PlayerController {
         float targetYaw = (float) Math.toDegrees(Math.atan2(-direction.x, direction.z));
 
         // Set rotation if we aren't too close
-        if (distanceToJumpPos > RoughActionState.ROUGH_MOMENTUM_THRESHOLD * 2) {
+        if (distanceToJumpPos > 0) { // RoughActionState.ROUGH_MOMENTUM_THRESHOLD * 2) {
             if (!roughState.rotationComplete) {
                 startYaw = client.player.getYaw();
                 PlayerController.targetYaw = targetYaw;
