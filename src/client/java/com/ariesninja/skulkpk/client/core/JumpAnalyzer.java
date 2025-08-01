@@ -362,24 +362,25 @@ public class JumpAnalyzer {
         // Simplified clearance check - ensure no blocks are blocking the jump path
         // Check a few points along the jump trajectory for obstacles
 
-        int steps = Math.max(Math.abs(end.getX() - start.getX()), Math.abs(end.getZ() - start.getZ()));
-        if (steps == 0) return true;
-
-        for (int i = 1; i <= steps; i++) {
-            double progress = (double) i / steps;
-            int x = (int) Math.round(start.getX() + progress * (end.getX() - start.getX()));
-            int z = (int) Math.round(start.getZ() + progress * (end.getZ() - start.getZ()));
-
-            // Assume jump arc goes up 1-2 blocks at the midpoint
-            int y = Math.max(start.getY(), end.getY()) + (i == steps / 2 ? 2 : 1);
-
-            BlockPos checkPos = new BlockPos(x, y, z);
-            if (world.getBlockState(checkPos).isSolidBlock(world, checkPos) ||
-                    world.getBlockState(checkPos.up()).isSolidBlock(world, checkPos.up())) {
-                return false;
-            }
-        }
-
+//        int steps = Math.max(Math.abs(end.getX() - start.getX()), Math.abs(end.getZ() - start.getZ()));
+//        if (steps == 0) return true;
+//
+//        for (int i = 1; i <= steps; i++) {
+//            double progress = (double) i / steps;
+//            int x = (int) Math.round(start.getX() + progress * (end.getX() - start.getX()));
+//            int z = (int) Math.round(start.getZ() + progress * (end.getZ() - start.getZ()));
+//
+//            // Assume jump arc goes up 1-2 blocks at the midpoint
+//            int y = Math.max(start.getY(), end.getY()) + (i == steps / 2 ? 2 : 1);
+//
+//            BlockPos checkPos = new BlockPos(x, y, z);
+//            if (world.getBlockState(checkPos).isSolidBlock(world, checkPos) ||
+//                    world.getBlockState(checkPos.up()).isSolidBlock(world, checkPos.up())) {
+//                return false;
+//            }
+//        }
+//
+//        return true;
         return true;
     }
 

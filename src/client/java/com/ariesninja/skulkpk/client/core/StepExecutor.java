@@ -42,7 +42,7 @@ public class StepExecutor {
         }
 
         // Process any pending logistics to generate sequences
-        jumpPlanner.processLogistics();
+        jumpPlanner.processLogistics(client);
 
         // Get the next available sequence
         currentSequence = jumpPlanner.getNextSequence();

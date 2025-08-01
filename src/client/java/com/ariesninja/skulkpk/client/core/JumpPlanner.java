@@ -4,6 +4,8 @@ import com.ariesninja.skulkpk.client.core.data.Step;
 import com.ariesninja.skulkpk.client.core.physics.Align;
 import com.ariesninja.skulkpk.client.core.physics.Momentum;
 import com.ariesninja.skulkpk.client.core.physics.Avoidance;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.math.Vec3d;
 
 import java.util.*;
@@ -91,10 +93,10 @@ public class JumpPlanner {
     /**
      * Processes pending logistics and generates step sequences
      */
-    public void processLogistics() {
+    public void processLogistics(MinecraftClient client) {
         while (!pendingLogistics.isEmpty()) {
             JumpLogistics logistics = pendingLogistics.poll();
-            StepSequence sequence = generateStepSequence(logistics);
+            StepSequence sequence = generateStepSequence(client, logistics);
             if (sequence != null) {
                 generatedSequences.add(sequence);
                 System.out.println("JumpPlanner: Generated sequence - " + sequence);
@@ -106,13 +108,16 @@ public class JumpPlanner {
      * Generates a step sequence based on the provided logistics
      * This is where the main planning logic would be implemented
      */
-    private StepSequence generateStepSequence(JumpLogistics logistics) {
+    private StepSequence generateStepSequence(MinecraftClient client, JumpLogistics logistics) {
         List<Step> steps = new ArrayList<>();
 
         // Run physics-based checks to determine complexity
+        boolean requiresAnyMomentum = Momentum.requiresAnyMomentum(client.player, logistics);
         boolean requiresPreciseAlignment = Align.requiresPreciseAlignment(logistics);
         boolean requiresAdvancedMomentum = Momentum.requiresAdvancedMomentum(logistics);
         boolean requiresObstacleAvoidance = Avoidance.requiresObstacleAvoidance(logistics);
+
+        System.out.println("requiresAnyMomentum: " + requiresAnyMomentum);
 
         System.out.println("JumpPlanner: Physics checks - Precise Alignment: " + requiresPreciseAlignment +
                 ", Advanced Momentum: " + requiresAdvancedMomentum +
@@ -121,7 +126,9 @@ public class JumpPlanner {
         // For now, all physics checks return false, so we use the simple 3-step strategy
         if (!requiresPreciseAlignment && !requiresAdvancedMomentum && !requiresObstacleAvoidance) {
             // Use the simple 3-step rough jump strategy
-            steps.add(Step.roughStart());
+            if (requiresAnyMomentum) {
+                steps.add(Step.roughStart());
+            }
             steps.add(Step.roughMomentum());
             steps.add(Step.roughJump());
 

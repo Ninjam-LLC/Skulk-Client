@@ -26,6 +26,7 @@ public class PlayerController {
         boolean isActive = false;
         int phase = 0; // Different phases for multi-phase actions
         Vec3d targetPosition = null;
+        Vec3d nextStepPosition = null;
         float targetYaw = 0.0f;
         boolean rotationComplete = false;
         boolean movementComplete = false;
@@ -96,6 +97,7 @@ public class PlayerController {
                 // Target position is the momentum start position (precise)
                 if (currentLogistics != null) {
                     roughState.targetPosition = currentLogistics.getMomentumStartPos().add(0, -0.45, 0);
+                    roughState.nextStepPosition = currentLogistics.getJumpPos().add(0, -0.45, 0);
                 }
                 break;
 
@@ -104,6 +106,7 @@ public class PlayerController {
                 if (currentLogistics != null) {
                     roughState.hasEnteredThreshold = false;
                     roughState.targetPosition = currentLogistics.getJumpPos().add(0, -0.45, 0);
+                    roughState.nextStepPosition = currentLogistics.getTargetPos();
                 }
                 break;
 
@@ -212,12 +215,13 @@ public class PlayerController {
                     Vec3d direction = roughState.targetPosition.subtract(playerPos).normalize();
                     float targetYaw = (float) Math.toDegrees(Math.atan2(-direction.x, direction.z));
 
-                    if (rotationTimer == 0) {
-                        // Start the rotation
-                        startYaw = client.player.getYaw();
-                        PlayerController.targetYaw = targetYaw;
-                        rotationTimer = ROTATION_DURATION;
-                    }
+                    // this is super bad
+//                    if (rotationTimer == 0) {
+//                        // Start the rotation
+//                        startYaw = client.player.getYaw();
+//                        PlayerController.targetYaw = targetYaw;
+//                        rotationTimer = ROTATION_DURATION;
+//                    }
 
                     // Check if we're close enough to the target rotation
                     float currentYaw = client.player.getYaw() % 360;
@@ -225,6 +229,14 @@ public class PlayerController {
                     // Handle yaw wrap-around (360 degrees)
                     if (yawDifference > 180) {
                         yawDifference = 360 - yawDifference;
+                    }
+
+                    if (rotationTimer == 0) {
+                        // Start the rotation
+                        startYaw = currentYaw;
+                        PlayerController.targetYaw = targetYaw;
+                        rotationTimer = ROTATION_DURATION;
+                        roughState.rotationComplete = false; // Reset for next rotation
                     }
 
                     System.out.println("Current Yaw: " + currentYaw + ", Target Yaw: " + targetYaw + ", Difference: " + yawDifference);
@@ -292,8 +304,8 @@ public class PlayerController {
         }
 
         // Check if we're at the edge of a block (about to fall)
-        boolean atBlockEdgeLegacy = Ledge.shouldAutoJump(0.001);
-        boolean atBlockEdge = AutoJumpHelper.INSTANCE.shouldAutoJump(client.player, client);
+        boolean atBlockEdge = Ledge.shouldAutoJump(0.001);
+        boolean atBlockEdgeLegacy = AutoJumpHelper.INSTANCE.shouldAutoJump(client.player, client);
 
         System.out.println("At block edge (legacy): " + atBlockEdgeLegacy +
                            ", At block edge (new): " + atBlockEdge);
@@ -309,16 +321,22 @@ public class PlayerController {
 
         // Stop conditions:
         // A) We're at the edge of a block and about to fall
-        if (atBlockEdge && roughState.lastValidPosition != null) {
+        if (atBlockEdge && roughState.lastValidPosition != null && roughState.hasEnteredThreshold) {
             roughState.isActive = false;
             System.out.println("PlayerController: ROUGH_MOMENTUM completed - reached block edge");
-            return;
         }
 
         // B) We've entered the threshold and are now exiting it (moving away)
         if (roughState.hasEnteredThreshold && distanceToJumpPos > RoughActionState.ROUGH_MOMENTUM_THRESHOLD && false) {
             roughState.isActive = false;
             System.out.println("PlayerController: ROUGH_MOMENTUM completed - exited threshold zone");
+        }
+
+        if (!roughState.isActive) {
+            Vec3d directionLanding = roughState.nextStepPosition.subtract(playerPos).normalize();
+            float targetYaw = (float) Math.toDegrees(Math.atan2(-directionLanding.x, directionLanding.z));
+            client.player.setYaw(targetYaw);
+            client.options.jumpKey.setPressed(true);
             return;
         }
 
@@ -380,7 +398,6 @@ public class PlayerController {
             // Sprint and jump
             client.options.sprintKey.setPressed(true);
             client.options.forwardKey.setPressed(true);
-            client.options.jumpKey.setPressed(true);
         } else {
             // We've reached the target area - stop everything
             stopAllMovement(client);

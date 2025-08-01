@@ -12,6 +12,6 @@ object AutoJumpHelper {
     fun shouldAutoJump(player: PlayerEntity, mc: MinecraftClient): Boolean {
         val simulatedPlayer = getSimulationForLocalPlayer()
 
-        return !simulatedPlayer.getSnapshotAt(10).onGround
+        return !simulatedPlayer.getSnapshotAt(2).onGround
     }
 }
