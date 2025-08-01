@@ -296,9 +296,9 @@ public class JumpAnalyzer {
         // - Maximum upward jump: 1.25 blocks (so landing 1 block higher is possible)
         // - Can fall any reasonable distance
 
-        if (minHorizontalDistance > 4.3) {
-            return false;
-        }
+//        if (minHorizontalDistance > 4.3) {
+//            return false;
+//        }
 
         if (dy > 1) {
             return false;
