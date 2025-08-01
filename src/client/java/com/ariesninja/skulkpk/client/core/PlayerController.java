@@ -3,6 +3,7 @@ package com.ariesninja.skulkpk.client.core;
 import com.ariesninja.skulkpk.client.core.data.Step;
 import com.ariesninja.skulkpk.client.core.JumpPlanner.JumpLogistics;
 import com.ariesninja.skulkpk.client.core.physics.utils.Ledge;
+import com.ariesninja.skulkpk.client.pk.AutoJumpHelper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
@@ -291,7 +292,11 @@ public class PlayerController {
         }
 
         // Check if we're at the edge of a block (about to fall)
-        boolean atBlockEdge = Ledge.shouldAutoJump(0.001);
+        boolean atBlockEdgeLegacy = Ledge.shouldAutoJump(0.001);
+        boolean atBlockEdge = AutoJumpHelper.INSTANCE.shouldAutoJump(client.player, client);
+
+        System.out.println("At block edge (legacy): " + atBlockEdgeLegacy +
+                           ", At block edge (new): " + atBlockEdge);
 
         // Update last valid position if we're still on solid ground
         if (!atBlockEdge) {
@@ -311,7 +316,7 @@ public class PlayerController {
         }
 
         // B) We've entered the threshold and are now exiting it (moving away)
-        if (roughState.hasEnteredThreshold && distanceToJumpPos > RoughActionState.ROUGH_MOMENTUM_THRESHOLD) {
+        if (roughState.hasEnteredThreshold && distanceToJumpPos > RoughActionState.ROUGH_MOMENTUM_THRESHOLD && false) {
             roughState.isActive = false;
             System.out.println("PlayerController: ROUGH_MOMENTUM completed - exited threshold zone");
             return;

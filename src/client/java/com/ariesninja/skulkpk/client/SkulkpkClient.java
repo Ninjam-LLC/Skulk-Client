@@ -1,7 +1,9 @@
 package com.ariesninja.skulkpk.client;
 
 import com.ariesninja.skulkpk.client.core.*;
+import com.ariesninja.skulkpk.client.core.physics.utils.Ledge;
 import com.ariesninja.skulkpk.client.core.rendering.SelectionRenderer;
+import com.ariesninja.skulkpk.client.pk.AutoJumpHelper;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
@@ -80,6 +82,13 @@ public class SkulkpkClient implements ClientModInitializer {
 
         if (Keybinds.TEST_KEY_2.wasPressed()) {
             PlayerController.cvmMovePlayer(client);
+        }
+
+        // Debug key to log AutoJumpHelper value when held
+        if (Keybinds.DEBUG_AUTOJUMP_KEY.isPressed() && client.player != null) {
+            boolean state0 = AutoJumpHelper.INSTANCE.shouldAutoJump(client.player, client);
+            boolean state1 = Ledge.shouldAutoJump(0.001);
+            System.out.println("state0: " + state0 + ", state1: " + state1);
         }
 
         // Call tick methods for ongoing execution

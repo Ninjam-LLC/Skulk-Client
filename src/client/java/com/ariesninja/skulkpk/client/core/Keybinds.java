@@ -53,6 +53,15 @@ public class Keybinds {
             )
     );
 
+    public static final KeyBinding DEBUG_AUTOJUMP_KEY = KeyBindingHelper.registerKeyBinding(
+            new KeyBinding(
+                    "key.skulkpk.debug_autojump",
+                    InputUtil.Type.KEYSYM,
+                    GLFW.GLFW_KEY_L,
+                    CATEGORY
+            )
+    );
+
     public static void register() {
         // This method is called to ensure the keybindings are registered.
     }

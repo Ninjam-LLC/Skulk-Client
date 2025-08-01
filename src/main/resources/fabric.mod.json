@@ -21,15 +21,12 @@
     ]
   },
   "mixins": [
-    "skulkpk.mixins.json",
-    {
-      "config": "skulkpk.client.mixins.json",
-      "environment": "client"
-    }
+    "skulkpk.client.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=${loader_version}",
     "fabric": "*",
     "minecraft": "${minecraft_version}"
-  }
+  },
+  "accessWidener": "skulkpk.accesswidener"
 }
