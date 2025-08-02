@@ -3,20 +3,33 @@ package com.ariesninja.skulkpk.client;
 import com.ariesninja.skulkpk.client.core.*;
 import com.ariesninja.skulkpk.client.core.physics.utils.Ledge;
 import com.ariesninja.skulkpk.client.core.rendering.SelectionRenderer;
+import com.ariesninja.skulkpk.client.license.LicenseInputScreen;
+import com.ariesninja.skulkpk.client.license.LicenseManager;
+import com.ariesninja.skulkpk.client.license.LicenseVerificationService;
 import com.ariesninja.skulkpk.client.pk.AutoJumpHelper;
+import com.ariesninja.skulkpk.client.util.ChatMessageUtil;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.world.RaycastContext;
 
 public class SkulkpkClient implements ClientModInitializer {
+    private boolean isVerifyingLicense = false;
 
     @Override
     public void onInitializeClient() {
         Keybinds.register();
         SelectionRenderer.register();
         ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
+
+        // Register server join event to verify license
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            verifyLicenseOnServerJoin(client);
+        });
     }
 
     private void onClientTick(MinecraftClient client) {
@@ -51,16 +64,7 @@ public class SkulkpkClient implements ClientModInitializer {
             // If neither selection nor execution was active, show a general clear message
             if (BlockSelector.getSelectedBlock() == null && !StepExecutor.getInstance().isExecuting()) {
                 if (client.player != null) {
-                    String prefix = "Skulk";
-                    String arrow = " > ";
-                    String message = "Nothing to clear";
-
-                    net.minecraft.text.Text prefixText = net.minecraft.text.Text.literal(prefix).formatted(net.minecraft.util.Formatting.AQUA, net.minecraft.util.Formatting.BOLD);
-                    net.minecraft.text.Text arrowText = net.minecraft.text.Text.literal(arrow).formatted(net.minecraft.util.Formatting.GRAY);
-                    net.minecraft.text.Text messageText = net.minecraft.text.Text.literal(message).formatted(net.minecraft.util.Formatting.GRAY);
-
-                    net.minecraft.text.Text fullMessage = net.minecraft.text.Text.empty().append(prefixText).append(arrowText).append(messageText);
-                    client.player.sendMessage(fullMessage, false);
+                    ChatMessageUtil.sendInfo(client, "Nothing to clear");
                 }
             }
 
@@ -94,5 +98,60 @@ public class SkulkpkClient implements ClientModInitializer {
         // Call tick methods for ongoing execution
         StepExecutor.getInstance().tick(client);
         PlayerController.tick(client);
+    }
+
+    private void verifyLicenseOnServerJoin(MinecraftClient client) {
+        if (isVerifyingLicense) return; // Prevent multiple verification attempts
+
+        String storedLicense = LicenseManager.getStoredLicense();
+        if (storedLicense == null) {
+            // No license stored, show input screen
+            client.execute(() -> client.setScreen(new LicenseInputScreen()));
+            return;
+        }
+
+        // Verify the stored license with the API
+        String username = client.getSession().getUsername();
+        isVerifyingLicense = true;
+
+        // Show verification message to player
+        if (client.player != null) {
+            ChatMessageUtil.sendWarn(client, "Verifying license...");
+        }
+
+        LicenseVerificationService.verifyLicense(username, storedLicense)
+                .thenAccept(result -> {
+                    client.execute(() -> {
+                        isVerifyingLicense = false;
+
+                        if (!result.isValid()) {
+                            // License is invalid, show input screen with error and pre-filled license
+                            if (client.player != null) {
+                                ChatMessageUtil.sendError(client, "Stored license is invalid: " + result.getMessage());
+                            }
+
+                            // Show license input screen with error and pre-filled data
+                            client.setScreen(new LicenseInputScreen("Automatic License Validation Failed", storedLicense));
+                        } else {
+                            // License is valid, allow continued play
+                            if (client.player != null) {
+                                ChatMessageUtil.sendSuccess(client, "License verified successfully!");
+                            }
+                        }
+                    });
+                })
+                .exceptionally(throwable -> {
+                    client.execute(() -> {
+                        isVerifyingLicense = false;
+
+                        if (client.player != null) {
+                            ChatMessageUtil.sendError(client, "License verification error: " + throwable.getMessage());
+                        }
+
+                        // Show license input screen with error and pre-filled data for network errors too
+                        client.setScreen(new LicenseInputScreen("License Verification Error", storedLicense));
+                    });
+                    return null;
+                });
     }
 }

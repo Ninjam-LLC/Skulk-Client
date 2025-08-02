@@ -3,9 +3,8 @@ package com.ariesninja.skulkpk.client.core;
 import com.ariesninja.skulkpk.client.core.data.Step;
 import com.ariesninja.skulkpk.client.core.JumpPlanner.JumpLogistics;
 import com.ariesninja.skulkpk.client.core.JumpPlanner.StepSequence;
+import com.ariesninja.skulkpk.client.util.ChatMessageUtil;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
@@ -31,13 +30,13 @@ public class StepExecutor {
      */
     public void executeSequence(MinecraftClient client) {
         if (isExecuting) {
-            showMessage(client, "Already executing a sequence!", Formatting.YELLOW);
+            ChatMessageUtil.sendWarn(client, "Already executing a sequence!");
             return;
         }
 
         // First, try to create logistics from current JumpAnalyzer state
         if (!createLogisticsFromAnalyzer()) {
-            showMessage(client, "No valid jump selected! Use SELECT key first.", Formatting.RED);
+            ChatMessageUtil.sendError(client, "No valid jump selected! Use SELECT key first.");
             return;
         }
 
@@ -47,14 +46,14 @@ public class StepExecutor {
         // Get the next available sequence
         currentSequence = jumpPlanner.getNextSequence();
         if (currentSequence == null) {
-            showMessage(client, "No executable sequence available!", Formatting.RED);
+            ChatMessageUtil.sendError(client, "No executable sequence available!");
             return;
         }
 
         // Start execution
         currentStepIndex = 0;
         isExecuting = true;
-        showMessage(client, "Starting sequence execution with " + currentSequence.getSteps().size() + " steps", Formatting.GREEN);
+        ChatMessageUtil.sendSuccess(client, "Starting sequence execution with " + currentSequence.getSteps().size() + " steps");
 
         // Execute the first step
         executeCurrentStep();
@@ -133,7 +132,7 @@ public class StepExecutor {
         BlockPos target = JumpAnalyzer.getOptimizedTargetBlock();
 
         if (jumpFrom == null || target == null) {
-            showMessage(MinecraftClient.getInstance(), "Lost jump data during execution!", Formatting.RED);
+            ChatMessageUtil.sendError(MinecraftClient.getInstance(), "Lost jump data during execution!");
             stopExecution();
             return;
         }
@@ -202,11 +201,10 @@ public class StepExecutor {
      * Completes the current execution
      */
     private void completeExecution() {
-        showMessage(MinecraftClient.getInstance(), "Sequence execution completed!", Formatting.GREEN);
         isExecuting = false;
         currentSequence = null;
         currentStepIndex = 0;
-        PlayerController.clearCurrentStep();
+        ChatMessageUtil.sendSuccess(MinecraftClient.getInstance(), "Sequence execution completed!");
     }
 
     /**
@@ -214,12 +212,10 @@ public class StepExecutor {
      */
     public void stopExecution() {
         if (isExecuting) {
-            showMessage(MinecraftClient.getInstance(), "Sequence execution stopped!", Formatting.YELLOW);
             isExecuting = false;
             currentSequence = null;
             currentStepIndex = 0;
-            PlayerController.clearCurrentStep();
-            PlayerController.stopAllMovement(MinecraftClient.getInstance());
+            ChatMessageUtil.sendWarn(MinecraftClient.getInstance(), "Sequence execution stopped!");
         }
     }
 
@@ -242,23 +238,6 @@ public class StepExecutor {
                            currentStepIndex + 1,
                            currentSequence.getSteps().size(),
                            currentSequence.getSteps().get(currentStepIndex).getAction());
-    }
-
-    /**
-     * Shows a formatted message to the player
-     */
-    private void showMessage(MinecraftClient client, String message, Formatting color) {
-        if (client.player != null) {
-            String prefix = "Skulk";
-            String arrow = " > ";
-
-            Text prefixText = Text.literal(prefix).formatted(Formatting.AQUA, Formatting.BOLD);
-            Text arrowText = Text.literal(arrow).formatted(Formatting.GRAY);
-            Text messageText = Text.literal(message).formatted(color);
-
-            Text fullMessage = Text.empty().append(prefixText).append(arrowText).append(messageText);
-            client.player.sendMessage(fullMessage, false);
-        }
     }
 
     /**

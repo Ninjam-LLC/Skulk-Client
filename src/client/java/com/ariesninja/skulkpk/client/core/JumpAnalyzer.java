@@ -1,12 +1,11 @@
 package com.ariesninja.skulkpk.client.core;
 
 import com.ariesninja.skulkpk.client.core.rendering.SelectionRenderer;
+import com.ariesninja.skulkpk.client.util.ChatMessageUtil;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.LadderBlock;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
@@ -516,19 +515,11 @@ public class JumpAnalyzer {
     }
 
     private static void showError(String message) {
-        String prefix = "Skulk"; // Configurable prefix
-        String arrow = " > "; // Gray arrow
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player != null) {
-            // Create formatted text: aqua bold "Skulk" + gray " > " + red message
-            Text prefixText = Text.literal(prefix).formatted(Formatting.AQUA, Formatting.BOLD);
-            Text arrowText = Text.literal(arrow).formatted(Formatting.GRAY);
-            Text messageText = Text.literal(message).formatted(Formatting.RED);
-
-            Text fullMessage = Text.empty().append(prefixText).append(arrowText).append(messageText);
-            client.player.sendMessage(fullMessage, false);
+            ChatMessageUtil.sendError(client, message);
         }
-        System.out.println("ERROR: " + prefix + arrow + message);
+        System.out.println("ERROR: Skulk > " + message);
 
         // Hide all highlights immediately
         SelectionRenderer.hideAllHighlights();

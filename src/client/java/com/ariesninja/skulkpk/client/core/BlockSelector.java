@@ -1,9 +1,8 @@
 package com.ariesninja.skulkpk.client.core;
 
 import com.ariesninja.skulkpk.client.core.rendering.SelectionRenderer;
+import com.ariesninja.skulkpk.client.util.ChatMessageUtil;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
 
@@ -25,20 +24,8 @@ public class BlockSelector {
     }
 
     private static void showSuccessMessage(MinecraftClient client, BlockPos blockPos) {
-
         SelectionRenderer.showHighlights();
-
-        String prefix = "Skulk";
-        String arrow = " > ";
-        String message = "Selected block at: " + blockPos.toShortString();
-
-        // Create formatted text: aqua bold "Skulk" + gray " > " + green message
-        Text prefixText = Text.literal(prefix).formatted(Formatting.AQUA, Formatting.BOLD);
-        Text arrowText = Text.literal(arrow).formatted(Formatting.GRAY);
-        Text messageText = Text.literal(message).withColor(0x97c29e);
-
-        Text fullMessage = Text.empty().append(prefixText).append(arrowText).append(messageText);
-        client.player.sendMessage(fullMessage, false);
+        ChatMessageUtil.sendSuccess(client, "Selected block at: " + blockPos.toShortString());
     }
 
     public static BlockPos getSelectedBlock() {
@@ -51,16 +38,7 @@ public class BlockSelector {
 
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player != null) {
-            String prefix = "Skulk";
-            String arrow = " > ";
-            String message = "Selection cleared";
-
-            Text prefixText = Text.literal(prefix).formatted(Formatting.AQUA, Formatting.BOLD);
-            Text arrowText = Text.literal(arrow).formatted(Formatting.GRAY);
-            Text messageText = Text.literal(message).formatted(Formatting.YELLOW);
-
-            Text fullMessage = Text.empty().append(prefixText).append(arrowText).append(messageText);
-            client.player.sendMessage(fullMessage, false);
+            ChatMessageUtil.sendWarn(client, "Selection cleared");
         }
     }
 }
