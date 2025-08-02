@@ -215,6 +215,7 @@ public class StepExecutor {
             isExecuting = false;
             currentSequence = null;
             currentStepIndex = 0;
+            PlayerController.clearCurrentStep(MinecraftClient.getInstance());
             ChatMessageUtil.sendWarn(MinecraftClient.getInstance(), "Sequence execution stopped!");
         }
     }

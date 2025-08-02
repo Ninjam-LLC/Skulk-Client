@@ -11,7 +11,11 @@ import net.minecraft.util.math.Vec3d;
 public class PlayerController {
 
     // Rotation state variables
+    private static int moveTimer = 0;
     private static int rotationTimer = 0;
+    private static int sneaktimer = 0;
+    private static int backtraceTimer = 0;
+
     private static float startYaw = 0.0f;
     private static float targetYaw = 0.0f;
     private static final int ROTATION_DURATION = 5; // 20 ticks (1 second at 20 TPS)
@@ -41,6 +45,7 @@ public class PlayerController {
         static final double ROUGH_MOMENTUM_THRESHOLD = 0.3; // blocks from jump pos
         static final double ROUGH_JUMP_THRESHOLD = 1.0; // blocks from target
         static final double EDGE_DETECTION_THRESHOLD = 0.1; // blocks from block edge
+        static final double ROUGH_JUMP_NOSPRINT_THRESHOLD = 3.8; // the jump gap to target without sprint
     }
 
     // Test method to rotate user (with smooth lerp over time)
@@ -51,8 +56,6 @@ public class PlayerController {
             rotationTimer = ROTATION_DURATION;
         }
     }
-
-    private static int moveTimer = 0;
 
     // Test method to move user (lerp required for movement) using keybinds and relevant delays
     public static void cvmMovePlayer(MinecraftClient client) {
@@ -138,12 +141,13 @@ public class PlayerController {
     /**
      * Clears the current step
      */
-    public static void clearCurrentStep() {
+    public static void clearCurrentStep(MinecraftClient client) {
         currentStep = null;
         currentLogistics = null;
         if (roughState != null) {
             roughState.isActive = false;
         }
+        stopAllMovement(client);
     }
 
     // Call this in a client tick event
@@ -171,6 +175,22 @@ public class PlayerController {
 
             client.player.setYaw(currentYaw);
             client.player.setPitch(client.player.getPitch()); // Maintain current pitch
+        }
+
+        // Handle sneak timer
+        if (sneaktimer > 0) {
+            sneaktimer--;
+            if (sneaktimer == 0 && client.options != null) {
+                client.options.sneakKey.setPressed(false);
+            }
+        }
+
+        // Handle backtrace timer
+        if (backtraceTimer > 0) {
+            backtraceTimer--;
+            if (backtraceTimer == 0 && client.options != null) {
+                client.options.backKey.setPressed(false);
+            }
         }
 
         // Handle rough action execution
@@ -296,6 +316,7 @@ public class PlayerController {
         }
 
         double distanceToJumpPos = playerPos.distanceTo(roughState.targetPosition);
+        double distanceToNextStep = playerPos.distanceTo(roughState.nextStepPosition);
 
         // Track if we've entered the threshold zone
         if (!roughState.hasEnteredThreshold && distanceToJumpPos <= RoughActionState.ROUGH_MOMENTUM_THRESHOLD) {
@@ -336,6 +357,13 @@ public class PlayerController {
             Vec3d directionLanding = roughState.nextStepPosition.subtract(playerPos).normalize();
             float targetYaw = (float) Math.toDegrees(Math.atan2(-directionLanding.x, directionLanding.z));
             client.player.setYaw(targetYaw);
+            // Sprint forward if the total horizontal distance to the target is more than 2 blocks
+            if (distanceToNextStep > RoughActionState.ROUGH_JUMP_NOSPRINT_THRESHOLD) {
+                System.out.println("RUNNING TO NEXT STEP: " + distanceToNextStep);
+                client.options.sprintKey.setPressed(true);
+            } else {
+                client.options.sprintKey.setPressed(false);
+            }
             client.options.jumpKey.setPressed(true);
             return;
         }
@@ -365,9 +393,12 @@ public class PlayerController {
         if (yawDifference > 20.0f) {
             return;
         }
-
-        // Sprint forward
-        client.options.sprintKey.setPressed(true);
+        if (distanceToNextStep > RoughActionState.ROUGH_JUMP_NOSPRINT_THRESHOLD) {
+            System.out.println("RUNNING TO NEXT STEP: " + distanceToNextStep);
+            client.options.sprintKey.setPressed(true);
+        } else {
+            client.options.sprintKey.setPressed(false);
+        }
         client.options.forwardKey.setPressed(true);
     }
 
@@ -395,13 +426,35 @@ public class PlayerController {
             // Set rotation (immediate for jump phase)
             client.player.setYaw(targetYaw);
 
-            // Sprint and jump
-            client.options.sprintKey.setPressed(true);
+            // Move forward
             client.options.forwardKey.setPressed(true);
+
+            // Sprint if the total horizontal distance is more than 2 blocks
+            if (distanceToTarget > RoughActionState.ROUGH_JUMP_NOSPRINT_THRESHOLD) {
+                client.options.sprintKey.setPressed(true);
+            } else {
+                client.options.sprintKey.setPressed(false);
+            }
+
+            // If the bottom half of our hitbox is within a ladder block, hold shift
+            if (client.player.isClimbing()) {
+                client.options.sneakKey.setPressed(true);
+                client.options.jumpKey.setPressed(false);
+            } else {
+                client.options.sneakKey.setPressed(false);
+            }
         } else {
             // We've reached the target area - stop everything
             stopAllMovement(client);
             client.options.jumpKey.setPressed(false);
+            client.options.sneakKey.setPressed(true);
+            sneaktimer = 4; // 4 ticks of sneak
+            if (client.player.jumping) {
+                backtraceTimer = 4; // 8 ticks of backtrace
+                client.options.backKey.setPressed(true);
+            } else {
+                backtraceTimer = 0; // No backtrace if not on ground
+            }
             roughState.isActive = false;
             System.out.println("PlayerController: ROUGH_JUMP completed");
         }

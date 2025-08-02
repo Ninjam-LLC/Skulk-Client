@@ -36,6 +36,11 @@ public class JumpAnalyzer {
         // Find the closest reachable block to the target without jumping
         jumpFromBlock = findClosestReachableBlock(player, world, target);
 
+        if (jumpFromBlock == null) {
+            showError("The block you are standing on is not yet supported!");
+            return;
+        }
+
         // Find the optimal target block
         optimizedTargetBlock = findOptimalTargetBlock(world, target, jumpFromBlock);
 
@@ -132,7 +137,8 @@ public class JumpAnalyzer {
         return (world.getBlockState(pos.down()).isSolidBlock(world, pos.down()) &&
                 !world.getBlockState(pos).isSolidBlock(world, pos) &&
                 !world.getBlockState(pos.up()).isSolidBlock(world, pos.up())) ||
-                isLadderClimbable(world, pos);
+//                isLadderClimbable(world, pos);
+                isLadderProp(world, pos);
     }
 
     private static boolean canReachWithoutJumping(World world, BlockPos start, BlockPos end) {
@@ -287,8 +293,14 @@ public class JumpAnalyzer {
 
         int dy = landingSpot.getY() - jumpFrom.getY();
 
+        // If the block 1 below is a ladder, it's not a valid end point for a jump
+        BlockState blockBelow = world.getBlockState(landingSpot.down());
+        if (blockBelow.getBlock() instanceof LadderBlock) {
+            return false; // Can't land on a ladder block
+        }
+
         // Calculate the closest possible horizontal distance between the blocks
-        double minHorizontalDistance = calculateMinHorizontalDistance(jumpFrom, landingSpot);
+//        double minHorizontalDistance = calculateMinHorizontalDistance(jumpFrom, landingSpot);
 
         // Basic jump constraints for Minecraft:
         // - Maximum horizontal distance: ~4.3 blocks for running jump (from closest edges)
@@ -777,6 +789,19 @@ public class JumpAnalyzer {
         if (blockState.getBlock() instanceof LadderBlock) {
             // Ensure there's head room (block above is passable)
             return !world.getBlockState(pos.up()).isSolidBlock(world, pos.up());
+        }
+
+        return false;
+    }
+
+    // Helper method to detect if a position is a ladder prop (1 block above a ladder)
+    private static boolean isLadderProp(World world, BlockPos pos) {
+        BlockState blockState = world.getBlockState(pos);
+
+        // Check if the current block is air
+        if (blockState.isAir()) {
+            // Check if the block below is air
+            return world.getBlockState(pos.down()).getBlock() instanceof LadderBlock;
         }
 
         return false;
