@@ -22,6 +22,7 @@ package com.ariesninja.skulkpk.client.mixin.minecraft.entity;
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
 import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
+import com.ariesninja.skulkpk.client.core.ModStateManager;
 import com.ariesninja.skulkpk.client.event.EventManager;
 import com.ariesninja.skulkpk.client.event.events.PlayerEquipmentChangeEvent;
 import com.ariesninja.skulkpk.client.event.events.PlayerSafeWalkEvent;
@@ -66,6 +67,9 @@ public abstract class MixinPlayerEntity extends MixinLivingEntity {
      */
     @ModifyVariable(method = "tickMovement", at = @At(value = "FIELD", target = "Lnet/minecraft/entity/player/PlayerEntity;strideDistance:F", shift = At.Shift.BEFORE, ordinal = 0), slice = @Slice(from = @At(value = "INVOKE", target = "Lnet/minecraft/entity/player/PlayerEntity;setMovementSpeed(F)V"), to = @At(value = "INVOKE", target = "Lnet/minecraft/entity/player/PlayerEntity;isSpectator()Z")), index = 1, ordinal = 0, require = 1, allow = 1)
     private float hookStrideForce(float strideForce) {
+        if (!ModStateManager.isModEnabled()) {
+            return strideForce;
+        }
         final PlayerStrideEvent event = new PlayerStrideEvent(strideForce);
         EventManager.INSTANCE.callEvent(event);
         return event.getStrideForce();
@@ -76,6 +80,9 @@ public abstract class MixinPlayerEntity extends MixinLivingEntity {
      */
     @ModifyReturnValue(method = "clipAtLedge", at = @At("RETURN"))
     private boolean hookSafeWalk(boolean original) {
+        if (!ModStateManager.isModEnabled()) {
+            return original;
+        }
         final var event = EventManager.INSTANCE.callEvent(new PlayerSafeWalkEvent());
         return original || event.isSafeWalk();
     }
@@ -87,7 +94,7 @@ public abstract class MixinPlayerEntity extends MixinLivingEntity {
      */
     @ModifyExpressionValue(method = "attack", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/player/PlayerEntity;getYaw()F"))
     private float hookFixRotation(float original) {
-        if ((Object) this != MinecraftClient.getInstance().player) {
+        if (!ModStateManager.isModEnabled()) {
             return original;
         }
 

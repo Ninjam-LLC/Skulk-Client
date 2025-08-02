@@ -1,5 +1,6 @@
 package com.ariesninja.skulkpk.client.license;
 
+import com.ariesninja.skulkpk.client.core.ModStateManager;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
@@ -14,6 +15,7 @@ public class LicenseInputScreen extends Screen {
     private TextFieldWidget licenseField;
     private ButtonWidget submitButton;
     private ButtonWidget exitButton;
+    private ButtonWidget disableModButton;
     private String statusMessage = "";
     private Formatting statusColor = Formatting.WHITE;
     private boolean isVerifying = false;
@@ -84,6 +86,15 @@ public class LicenseInputScreen extends Screen {
         .dimensions(centerX + 10, centerY + 20, 90, 20)
         .build();
         this.addDrawableChild(this.exitButton);
+
+        // Disable Mod button
+        this.disableModButton = ButtonWidget.builder(
+            Text.literal("Disable Mod"),
+            button -> this.disableMod()
+        )
+        .dimensions(centerX - 100, centerY + 50, 190, 20)
+        .build();
+        this.addDrawableChild(this.disableModButton);
     }
 
     private void verifyLicense() {
@@ -130,6 +141,22 @@ public class LicenseInputScreen extends Screen {
                 });
                 return null;
             });
+    }
+
+    private void disableMod() {
+        // Disable the mod functionality
+        ModStateManager.disableMod();
+        this.setStatus("Mod disabled for this session", Formatting.YELLOW);
+
+        // Close the screen after a short delay
+        new Thread(() -> {
+            try {
+                Thread.sleep(1000);
+                this.client.execute(() -> this.close());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }).start();
     }
 
     private void setStatus(String message, Formatting color) {
@@ -199,11 +226,12 @@ public class LicenseInputScreen extends Screen {
         // Render buttons only (not the text field since we draw it manually)
         this.submitButton.render(context, mouseX, mouseY, delta);
         this.exitButton.render(context, mouseX, mouseY, delta);
+        this.disableModButton.render(context, mouseX, mouseY, delta);
 
         // Draw status message last so it appears on top of everything
         if (!this.statusMessage.isEmpty()) {
             Text statusText = Text.literal(this.statusMessage).formatted(this.statusColor);
-            context.drawCenteredTextWithShadow(this.textRenderer, statusText, centerX, centerY + 50, 0xFFFFFF);
+            context.drawCenteredTextWithShadow(this.textRenderer, statusText, centerX, centerY + 80, 0xFFFFFF);
         }
     }
 

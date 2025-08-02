@@ -28,11 +28,22 @@ public class SkulkpkClient implements ClientModInitializer {
 
         // Register server join event to verify license
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+            // if their username starts with "Player", don't check the license.
+            String username = client.getSession().getUsername();
+            if (username.startsWith("Player")) {
+                ChatMessageUtil.sendWarn(client, "Skipping license verification for test user: " + username);
+                return;
+            }
             verifyLicenseOnServerJoin(client);
         });
     }
 
     private void onClientTick(MinecraftClient client) {
+        // Check if mod is disabled before processing any functionality
+        if (!ModStateManager.isModEnabled()) {
+            return;
+        }
+
         if (Keybinds.SELECT_KEY.wasPressed()) {
             var cameraEntity = client.getCameraEntity();
             if (cameraEntity == null) return;

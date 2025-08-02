@@ -47,12 +47,12 @@ public class LicenseVerificationService {
                         }
                         return new LicenseVerificationResult(false, "This license is expired.");
                     }
-                    return new LicenseVerificationResult(false, "Server error: " + response.statusCode());
+                    return new LicenseVerificationResult(false, "The server can't complete your verification.");
                 }
             } catch (IOException | InterruptedException e) {
-                return new LicenseVerificationResult(false, "Network error: " + e.getMessage());
+                return new LicenseVerificationResult(false, "Cannot connect to the license server.");
             } catch (Exception e) {
-                return new LicenseVerificationResult(false, "Unexpected error: " + e.getMessage());
+                return new LicenseVerificationResult(false, "An unexpected error occurred.");
             }
         });
     }
