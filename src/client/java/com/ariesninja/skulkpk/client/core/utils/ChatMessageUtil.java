@@ -1,4 +1,4 @@
-package com.ariesninja.skulkpk.client.util;
+package com.ariesninja.skulkpk.client.core.utils;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;

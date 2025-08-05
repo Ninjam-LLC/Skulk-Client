@@ -35,32 +35,32 @@ public class Keybinds {
             )
     );
 
-    public static final KeyBinding TEST_KEY_1 = KeyBindingHelper.registerKeyBinding(
-            new KeyBinding(
-                    "key.skulkpk.test",
-                    InputUtil.Type.KEYSYM,
-                    GLFW.GLFW_KEY_J,
-                    CATEGORY
-            )
-    );
+//    public static final KeyBinding TEST_KEY_1 = KeyBindingHelper.registerKeyBinding(
+//            new KeyBinding(
+//                    "key.skulkpk.test",
+//                    InputUtil.Type.KEYSYM,
+//                    GLFW.GLFW_KEY_J,
+//                    CATEGORY
+//            )
+//    );
+//
+//    public static final KeyBinding TEST_KEY_2 = KeyBindingHelper.registerKeyBinding(
+//            new KeyBinding(
+//                    "key.skulkpk.test2",
+//                    InputUtil.Type.KEYSYM,
+//                    GLFW.GLFW_KEY_K,
+//                    CATEGORY
+//            )
+//    );
 
-    public static final KeyBinding TEST_KEY_2 = KeyBindingHelper.registerKeyBinding(
-            new KeyBinding(
-                    "key.skulkpk.test2",
-                    InputUtil.Type.KEYSYM,
-                    GLFW.GLFW_KEY_K,
-                    CATEGORY
-            )
-    );
-
-    public static final KeyBinding DEBUG_AUTOJUMP_KEY = KeyBindingHelper.registerKeyBinding(
-            new KeyBinding(
-                    "key.skulkpk.debug_autojump",
-                    InputUtil.Type.KEYSYM,
-                    GLFW.GLFW_KEY_L,
-                    CATEGORY
-            )
-    );
+//    public static final KeyBinding DEBUG_AUTOJUMP_KEY = KeyBindingHelper.registerKeyBinding(
+//            new KeyBinding(
+//                    "key.skulkpk.debug_autojump",
+//                    InputUtil.Type.KEYSYM,
+//                    GLFW.GLFW_KEY_L,
+//                    CATEGORY
+//            )
+//    );
 
     public static void register() {
         // This method is called to ensure the keybindings are registered.

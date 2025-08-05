@@ -1,4 +1,4 @@
-package com.ariesninja.skulkpk.client.core;
+package com.ariesninja.skulkpk.client.core.utils;
 
 public class ModStateManager {
     private static boolean modEnabled = true;

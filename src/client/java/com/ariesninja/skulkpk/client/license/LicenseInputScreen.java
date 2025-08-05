@@ -1,6 +1,6 @@
 package com.ariesninja.skulkpk.client.license;
 
-import com.ariesninja.skulkpk.client.core.ModStateManager;
+import com.ariesninja.skulkpk.client.core.utils.ModStateManager;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;

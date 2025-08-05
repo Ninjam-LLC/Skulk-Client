@@ -4,7 +4,7 @@ import com.ariesninja.skulkpk.client.core.data.Step;
 import com.ariesninja.skulkpk.client.core.JumpPlanner.JumpLogistics;
 import com.ariesninja.skulkpk.client.core.JumpPlanner.StepSequence;
 import com.ariesninja.skulkpk.client.core.physics.Dist;
-import com.ariesninja.skulkpk.client.util.ChatMessageUtil;
+import com.ariesninja.skulkpk.client.core.utils.ChatMessageUtil;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
@@ -120,6 +120,7 @@ public class StepExecutor {
      * Executes the current step in the sequence
      */
     private void executeCurrentStep() {
+
         if (currentSequence == null || currentStepIndex >= currentSequence.getSteps().size()) {
             completeExecution();
             return;
@@ -143,7 +144,7 @@ public class StepExecutor {
         PlayerController.executeStep(currentStep, logistics);
 
         System.out.println("StepExecutor: Executing step " + (currentStepIndex + 1) + "/" +
-                          currentSequence.getSteps().size() + " - " + currentStep.getAction());
+                          currentSequence.getSteps().size() + " - " + currentStep);
     }
 
     /**
@@ -237,7 +238,7 @@ public class StepExecutor {
         return String.format("Step %d/%d (%s)",
                            currentStepIndex + 1,
                            currentSequence.getSteps().size(),
-                           currentSequence.getSteps().get(currentStepIndex).getAction());
+                           currentSequence.getSteps().get(currentStepIndex));
     }
 
     /**

@@ -21,8 +21,7 @@ package com.ariesninja.skulkpk.client.mixin.minecraft.entity;
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.llamalad7.mixinextras.injector.ModifyReturnValue;
-import com.llamalad7.mixinextras.injector.v2.WrapWithCondition;
-import com.ariesninja.skulkpk.client.core.ModStateManager;
+import com.ariesninja.skulkpk.client.core.utils.ModStateManager;
 import com.ariesninja.skulkpk.client.event.EventManager;
 import com.ariesninja.skulkpk.client.event.events.PlayerEquipmentChangeEvent;
 import com.ariesninja.skulkpk.client.event.events.PlayerSafeWalkEvent;
@@ -37,21 +36,14 @@ import com.ariesninja.skulkpk.client.event.events.PlayerStrideEvent;
 //import com.ariesninja.skulkpk.client.features.module.modules.world.ModuleNoSlowBreak;
 import com.ariesninja.skulkpk.client.utils.aiming.RotationManager;
 import com.ariesninja.skulkpk.client.utils.aiming.features.MovementCorrection;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(PlayerEntity.class)
 public abstract class MixinPlayerEntity extends MixinLivingEntity {

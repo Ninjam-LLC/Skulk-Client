@@ -29,4 +29,11 @@ public class Dist {
         return Math.min(deltaX, deltaZ);
     }
 
+    // Get the real distance between two edges with the height difference considered
+    public static double realDistanceWithHeight(BlockPos pos1, BlockPos pos2) {
+        double horizontalDistance = realDistance(pos1, pos2);
+        double verticalDistance = Math.abs(pos1.getY() - pos2.getY());
+        return Math.sqrt(horizontalDistance * horizontalDistance + verticalDistance * verticalDistance);
+    }
+
 }

@@ -1,10 +1,9 @@
 package com.ariesninja.skulkpk.client.core;
 
 import com.ariesninja.skulkpk.client.core.data.Step;
-import com.ariesninja.skulkpk.client.core.physics.Align;
-import com.ariesninja.skulkpk.client.core.physics.Momentum;
-import com.ariesninja.skulkpk.client.core.physics.Avoidance;
-import com.ariesninja.skulkpk.client.core.physics.Obstructions;
+import com.ariesninja.skulkpk.client.core.data.schemes.Pattern;
+import com.ariesninja.skulkpk.client.core.physics.*;
+import com.ariesninja.skulkpk.client.core.utils.ChatMessageUtil;
 import com.jcraft.jorbis.Block;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerEntity;
@@ -120,40 +119,38 @@ public class JumpPlanner {
         boolean requiresAdvancedMomentum = Momentum.requiresAdvancedMomentum(logistics);
         boolean requiresObstacleAvoidance = Avoidance.requiresObstacleAvoidance(logistics);
 
-        System.out.println("requiresAnyMomentum: " + requiresAnyMomentum);
+        if (Obstructions.isNeoJump(client, logistics)) {
 
-        System.out.println("JumpPlanner: Physics checks - Precise Alignment: " + requiresPreciseAlignment +
-                ", Advanced Momentum: " + requiresAdvancedMomentum +
-                ", Obstacle Avoidance: " + requiresObstacleAvoidance);
+            // Use the align + neo A strategy for minor neos
+            if (Obstructions.isMinorNeo(client, logistics)) {
+                steps.add(Step.UNIT_SAFE_CORNER);
+                steps.add(Step.NEO_A);
+                return new StepSequence(steps);
+            }
 
-        if (Obstructions.isMinorNeo(client, logistics)) {
-            System.out.println("JumpPlanner: Short neo jump detected, using neo A strategy");
-            // Use the neo A strategy for minor neos
-            steps.add(Step.unitSafeCorner());
-            steps.add(Step.neoA());
+            // Use technic AP for triple neo with AP pattern
+            if (Patterns.doesJumpMatchPattern(client, logistics.getJumpBlockPos(), logistics.getTargetBlockPos(), Pattern.tripleNeoAP)) {
+                steps.add(Step.UNIT_SAFE_CORNER_BACK);
+                steps.add(Step.NEO_3_AP);
+                return new StepSequence(steps);
+            }
+
+        }
+
+        // Use the simple 3-step rough jump strategy
+        if (!requiresPreciseAlignment && !requiresAdvancedMomentum && !requiresObstacleAvoidance) {
+            if (requiresAnyMomentum) {
+                steps.add(Step.ROUGH_START);
+            }
+            steps.add(Step.ROUGH_MOMENTUM);
+            steps.add(Step.ROUGH_JUMP);
             return new StepSequence(steps);
         }
 
-        // For now, all physics checks return false, so we use the simple 3-step strategy
-        if (!requiresPreciseAlignment && !requiresAdvancedMomentum && !requiresObstacleAvoidance) {
-            //            // Use the simple 3-step rogh jump strategy
-            if (requiresAnyMomentum) {
-                steps.add(Step.roughStart());
-            }
-            steps.add(Step.roughMomentum());
-            steps.add(Step.roughJump());
-
-            System.out.println("JumpPlanner: Using simple 3-step rough jump strategy");
-        } else {
-            // TODO: Implement complex jump strategies for cases requiring:
-            // - Precise alignment
-            // - Advanced momentum calculations
-            // - Obstacle avoidance
-            System.out.println("JumpPlanner: Complex jump strategies not yet implemented");
-            return null;
-        }
-
-        return new StepSequence(steps);
+        // Inform the user that this jump isn't supported yet via chat
+        ChatMessageUtil.sendError(client, "This jump requires advanced planning and is not yet supported. " +
+                "Please report this jump to the developers for future support.");
+        return null; // Unsupported jump type
     }
 
     /**

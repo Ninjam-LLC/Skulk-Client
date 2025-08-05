@@ -1,7 +1,7 @@
 package com.ariesninja.skulkpk.client.core;
 
 import com.ariesninja.skulkpk.client.core.rendering.SelectionRenderer;
-import com.ariesninja.skulkpk.client.util.ChatMessageUtil;
+import com.ariesninja.skulkpk.client.core.utils.ChatMessageUtil;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.LadderBlock;
 import net.minecraft.client.MinecraftClient;

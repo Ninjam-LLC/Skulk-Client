@@ -2,12 +2,15 @@ package com.ariesninja.skulkpk.client.core;
 
 import com.ariesninja.skulkpk.client.core.data.Step;
 import com.ariesninja.skulkpk.client.core.JumpPlanner.JumpLogistics;
+import com.ariesninja.skulkpk.client.core.physics.Dist;
 import com.ariesninja.skulkpk.client.core.physics.Obstructions;
 import com.ariesninja.skulkpk.client.core.physics.utils.Ledge;
+import com.ariesninja.skulkpk.client.core.utils.ChatMessageUtil;
 import com.ariesninja.skulkpk.client.pk.AutoJumpHelper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.MathHelper;
 
 public class PlayerController {
 
@@ -22,7 +25,7 @@ public class PlayerController {
     private static float targetYaw = 0.0f;
 
     // Specific constants
-    private static final int ROTATION_DURATION = 5; // 20 ticks (1 second at 20 TPS)
+    private static final int ROTATION_DURATION = 5; // ticks (50ms)
     private static final float NEO_ROTATION_OFFSET = 3.2f; // Degrees
 
     // Step execution state
@@ -47,10 +50,9 @@ public class PlayerController {
         // Thresholds for stop conditions
         static final double ROUGH_START_NEARBY_THRESHOLD = 0.5; // blocks
         static final double ROUGH_START_PRECISE_THRESHOLD = 0.1; // blocks
-        static final double ROUGH_MOMENTUM_THRESHOLD = 0.3; // blocks from jump pos
+        static final double ROUGH_MOMENTUM_THRESHOLD = 0.4; // blocks from jump pos
         static final double ROUGH_JUMP_THRESHOLD = 1.0; // blocks from target
-        static final double EDGE_DETECTION_THRESHOLD = 0.1; // blocks from block edge
-        static final double ROUGH_JUMP_NOSPRINT_THRESHOLD = 3.8; // the jump gap to target without sprint
+        static final double ROUGH_JUMP_NOSPRINT_THRESHOLD = 2; // the jump gap to target without sprint
     }
 
     // Generic action state tracking
@@ -67,23 +69,6 @@ public class PlayerController {
         static final double JUMP_THRESHOLD = 0.6;
     }
 
-    // Test method to rotate user (with smooth lerp over time)
-    public static void cvmRotatePlayer(MinecraftClient client) {
-        if (client.player != null && rotationTimer == 0) {
-            startYaw = client.player.getYaw();
-            targetYaw = startYaw + 90.0f;
-            rotationTimer = ROTATION_DURATION;
-        }
-    }
-
-    // Test method to move user (lerp required for movement) using keybinds and relevant delays
-    public static void cvmMovePlayer(MinecraftClient client) {
-        if (client.options != null) {
-            client.options.forwardKey.setPressed(true);
-            moveTimer = 8; // Move for 8 ticks (400ms at 20 TPS)
-        }
-    }
-
     /**
      * Executes a step with the given logistics data
      */
@@ -93,33 +78,28 @@ public class PlayerController {
 
         // Add null checks to prevent NullPointerException
         if (step == null) {
-            System.err.println("PlayerController: Cannot execute null step!");
+            System.err.println("PlayerController: Cannot execute empty step!");
             return;
         }
 
-        if (step.getAction() == null) {
-            System.err.println("PlayerController: Cannot execute step with null action type!");
-            return;
-        }
+        if (step == Step.ROUGH_START ||
+                step == Step.ROUGH_MOMENTUM ||
+                step == Step.ROUGH_JUMP) {
 
-        if (step.getAction() == Step.ActionType.ROUGH_START ||
-                step.getAction() == Step.ActionType.ROUGH_MOMENTUM ||
-                step.getAction() == Step.ActionType.ROUGH_JUMP) {
-
-            initializeRoughAction(step.getAction());
+            initializeRoughAction(step);
         } else {
             // Initialize generic action state for other action types
-            initializeGenericAction(step.getAction());
+            initializeGenericAction(step);
         }
 
 
-        System.out.println("PlayerController: Executing step - " + step.getAction());
+        System.out.println("PlayerController: Executing step - " + step);
     }
 
     /**
      * Initializes state for rough action types
      */
-    private static void initializeRoughAction(Step.ActionType actionType) {
+    private static void initializeRoughAction(Step step) {
         if (roughState == null) {
             roughState = new RoughActionState();
         }
@@ -129,7 +109,7 @@ public class PlayerController {
         roughState.rotationComplete = false;
         roughState.movementComplete = false;
 
-        switch (actionType) {
+        switch (step) {
             case ROUGH_START:
                 // Target position is the momentum start position (precise)
                 if (currentLogistics != null) {
@@ -156,7 +136,7 @@ public class PlayerController {
         }
     }
 
-    private static void initializeGenericAction(Step.ActionType actionType) {
+    private static void initializeGenericAction(Step step) {
         if (genericState == null) {
             genericState = new GenericActionState();
         }
@@ -166,7 +146,7 @@ public class PlayerController {
         genericState.rotationComplete = false;
         genericState.movementComplete = false;
 
-        switch (actionType) {
+        switch (step) {
             case UNIT_SAFE_CORNER:
                 genericState.targetPosition = currentLogistics.getTargetPos();
                 break;
@@ -175,7 +155,7 @@ public class PlayerController {
                 genericState.nextStepPosition = currentLogistics.getTargetPos();
                 break;
             default:
-                // Other actions can be handled here
+                genericState.targetPosition = currentLogistics.getTargetPos();
                 break;
         }
     }
@@ -186,14 +166,10 @@ public class PlayerController {
     public static boolean isStepComplete() {
         if (currentStep == null) return true;
 
-        switch (currentStep.getAction()) {
-            case ROUGH_START:
-            case ROUGH_MOMENTUM:
-            case ROUGH_JUMP:
-                return roughState != null && !roughState.isActive;
-            default:
-                return genericState != null && !genericState.isActive;
-        }
+        return switch (currentStep) {
+            case ROUGH_START, ROUGH_MOMENTUM, ROUGH_JUMP -> roughState != null && !roughState.isActive;
+            default -> genericState != null && !genericState.isActive;
+        };
     }
 
     /**
@@ -228,8 +204,14 @@ public class PlayerController {
             // Use smooth step for more natural rotation
             float smoothProgress = progress * progress * (3.0f - 2.0f * progress);
 
-            // Interpolate between start and target yaw
-            float currentYaw = startYaw + (targetYaw - startYaw) * smoothProgress;
+            // Handle angle wrapping for interpolation
+            float angleDifference = MathHelper.wrapDegrees(targetYaw - startYaw);
+
+            // Interpolate using the wrapped difference
+            float currentYaw = startYaw + angleDifference * smoothProgress;
+
+            // Wrap the final result
+            currentYaw = MathHelper.wrapDegrees(currentYaw);
 
             client.player.setYaw(currentYaw);
             client.player.setPitch(client.player.getPitch()); // Maintain current pitch
@@ -266,9 +248,10 @@ public class PlayerController {
      * Handles the execution of rough action types
      */
     private static void handleRoughAction(MinecraftClient client) {
+        if (client.player == null) return;
         Vec3d playerPos = client.player.getPos();
 
-        switch (currentStep.getAction()) {
+        switch (currentStep) {
             case ROUGH_START:
                 handleRoughStart(client, playerPos);
                 break;
@@ -282,15 +265,19 @@ public class PlayerController {
     }
 
     private static void handleGenericAction(MinecraftClient client) {
-        Vec3d playerPos = client.player.getPos();
+        if (client.player == null) return;
 
-        switch (currentStep.getAction()) {
+        switch (currentStep) {
             case UNIT_SAFE_CORNER:
-                handleCorner(client);
+                handleCorner(client, false);
+                break;
+            case UNIT_SAFE_CORNER_BACK:
+                handleCorner(client, true);
                 break;
             case NEO_A:
                 handleNeoA(client);
                 break;
+
             default:
                 // Other actions can be handled here
                 break;
@@ -314,36 +301,26 @@ public class PlayerController {
                     Vec3d direction = roughState.targetPosition.subtract(playerPos).normalize();
                     float targetYaw = (float) Math.toDegrees(Math.atan2(-direction.x, direction.z));
 
-                    // this is super bad
-//                    if (rotationTimer == 0) {
-//                        // Start the rotation
-//                        startYaw = client.player.getYaw();
-//                        PlayerController.targetYaw = targetYaw;
-//                        rotationTimer = ROTATION_DURATION;
-//                    }
+                    if (client.player == null) return;
+                    // Normalize current yaw to the range [-180, 180]
+                    float currentYaw = MathHelper.wrapDegrees(client.player.getYaw());
+
+                    // Calculate the shortest difference, handling wrap-around
+                    float yawDifference = MathHelper.wrapDegrees(targetYaw - currentYaw);
 
                     // Check if we're close enough to the target rotation
-                    float currentYaw = client.player.getYaw() % 360;
-                    float yawDifference = Math.abs(currentYaw - targetYaw);
-                    // Handle yaw wrap-around (360 degrees)
-                    if (yawDifference > 180) {
-                        yawDifference = 360 - yawDifference;
-                    }
-
-                    if (rotationTimer == 0) {
-                        // Start the rotation
-                        startYaw = currentYaw;
-                        PlayerController.targetYaw = targetYaw;
-                        rotationTimer = ROTATION_DURATION;
-                        roughState.rotationComplete = false; // Reset for next rotation
-                    }
-
-                    System.out.println("Current Yaw: " + currentYaw + ", Target Yaw: " + targetYaw + ", Difference: " + yawDifference);
-
                     if (Math.abs(yawDifference) < 3.0f) {
                         roughState.rotationComplete = true;
                         roughState.phase = 1;
                         rotationTimer = 0; // Stop rotation
+                    } else {
+                        // Set target yaw for smooth rotation
+                        if (rotationTimer == 0) {
+                            startYaw = currentYaw;
+                            PlayerController.targetYaw = targetYaw;
+                            rotationTimer = ROTATION_DURATION;
+                            roughState.rotationComplete = false; // Ensure we are not yet complete
+                        }
                     }
                 }
                 break;
@@ -371,7 +348,9 @@ public class PlayerController {
                     Vec3d direction = roughState.targetPosition.subtract(playerPos).normalize();
 
                     float targetYaw = (float) Math.toDegrees(Math.atan2(-direction.x, direction.z));
-                    client.player.setYaw(targetYaw);
+                    if (client.player != null) {
+                        client.player.setYaw(targetYaw);
+                    }
                     client.options.forwardKey.setPressed(true);
                 } else {
                     // Stop all movement - we've reached the precise position
@@ -397,6 +376,8 @@ public class PlayerController {
         double distanceToJumpPos = playerPos.distanceTo(roughState.targetPosition);
         double distanceToNextStep = playerPos.distanceTo(roughState.nextStepPosition);
 
+        double jumpGap = Dist.realDistanceWithHeight(currentLogistics.getJumpBlockPos(), currentLogistics.getTargetBlockPos());
+
         // Track if we've entered the threshold zone
         if (!roughState.hasEnteredThreshold && distanceToJumpPos <= RoughActionState.ROUGH_MOMENTUM_THRESHOLD) {
             roughState.hasEnteredThreshold = true;
@@ -405,6 +386,7 @@ public class PlayerController {
 
         // Check if we're at the edge of a block (about to fall)
         boolean atBlockEdge = Ledge.shouldAutoJump(0.001);
+        if (client.player == null) return;
         boolean atBlockEdgeLegacy = AutoJumpHelper.INSTANCE.shouldAutoJump(client.player, client);
 
         System.out.println("At block edge (legacy): " + atBlockEdgeLegacy +
@@ -419,17 +401,10 @@ public class PlayerController {
                 ", Has entered threshold: " + roughState.hasEnteredThreshold +
                 ", At block edge: " + atBlockEdge);
 
-        // Stop conditions:
-        // A) We're at the edge of a block and about to fall
+        // We're at the edge of a block and about to fall
         if (atBlockEdge && roughState.lastValidPosition != null && roughState.hasEnteredThreshold) {
             roughState.isActive = false;
             System.out.println("PlayerController: ROUGH_MOMENTUM completed - reached block edge");
-        }
-
-        // B) We've entered the threshold and are now exiting it (moving away)
-        if (false) {
-            roughState.isActive = false;
-            System.out.println("PlayerController: ROUGH_MOMENTUM completed - exited threshold zone");
         }
 
         if (!roughState.isActive) {
@@ -437,7 +412,7 @@ public class PlayerController {
             float targetYaw = (float) Math.toDegrees(Math.atan2(-directionLanding.x, directionLanding.z));
             client.player.setYaw(targetYaw);
             // Sprint forward if the total horizontal distance to the target is more than 2 blocks
-            if (distanceToNextStep > RoughActionState.ROUGH_JUMP_NOSPRINT_THRESHOLD) {
+            if (jumpGap > RoughActionState.ROUGH_JUMP_NOSPRINT_THRESHOLD) {
                 System.out.println("RUNNING TO NEXT STEP: " + distanceToNextStep);
                 client.options.sprintKey.setPressed(true);
             } else {
@@ -449,30 +424,41 @@ public class PlayerController {
 
         // Continue moving toward jump position
         Vec3d direction = roughState.targetPosition.subtract(playerPos).normalize();
+
+        // If we have entered the threshold, we need to rotate toward the next step position
+        if (roughState.hasEnteredThreshold && roughState.nextStepPosition != null) {
+            direction = roughState.nextStepPosition.subtract(playerPos).normalize();
+        }
+
         float targetYaw = (float) Math.toDegrees(Math.atan2(-direction.x, direction.z));
 
-        // Set rotation if we aren't too close
-        if (distanceToJumpPos > 0) { // RoughActionState.ROUGH_MOMENTUM_THRESHOLD * 2) {
-            if (!roughState.rotationComplete) {
-                startYaw = client.player.getYaw();
+        if (client.player == null) return;
+        // Normalize current yaw to the range [-180, 180]
+        float currentYaw = MathHelper.wrapDegrees(client.player.getYaw());
+
+        // Calculate the shortest difference, handling wrap-around
+        float yawDifference = MathHelper.wrapDegrees(targetYaw - currentYaw);
+
+        // Check if we're close enough to the target rotation
+        if (Math.abs(yawDifference) < 5.0f) {
+            roughState.rotationComplete = true;
+            roughState.phase = 1;
+            rotationTimer = 0; // Stop rotation
+        } else {
+            // Set target yaw for smooth rotation
+            if (rotationTimer == 0) {
+                startYaw = currentYaw;
                 PlayerController.targetYaw = targetYaw;
                 rotationTimer = ROTATION_DURATION;
-                roughState.rotationComplete = true;
+                roughState.rotationComplete = false; // Ensure we are not yet complete
             }
         }
 
-        // Don't move until we are almost at the right rotation
-        float currentYaw = client.player.getYaw() % 360;
-        float yawDifference = Math.abs(currentYaw - targetYaw);
-        // Handle yaw wrap-around (360 degrees)
-        if (yawDifference > 180) {
-            yawDifference = 360 - yawDifference;
-        }
-
-        if (yawDifference > 20.0f) {
+        if (Math.abs(yawDifference) > 10.0f && !roughState.hasEnteredThreshold) {
+            client.options.forwardKey.setPressed(false);
             return;
         }
-        if (distanceToNextStep > RoughActionState.ROUGH_JUMP_NOSPRINT_THRESHOLD) {
+        if (jumpGap > RoughActionState.ROUGH_JUMP_NOSPRINT_THRESHOLD) {
             System.out.println("RUNNING TO NEXT STEP: " + distanceToNextStep);
             client.options.sprintKey.setPressed(true);
         } else {
@@ -480,11 +466,6 @@ public class PlayerController {
         }
         client.options.forwardKey.setPressed(true);
     }
-
-    /**
-     * Checks if the player is at the edge of a block and about to fall
-     */
-
 
     /**
      * ROUGH_JUMP: Jump while sprinting toward target block
@@ -496,6 +477,8 @@ public class PlayerController {
         }
 
         double distanceToTarget = playerPos.distanceTo(roughState.targetPosition);
+        // Get jump gap from jump block and target block
+        double jumpGap = Dist.realDistanceWithHeight(currentLogistics.getJumpBlockPos(), currentLogistics.getTargetBlockPos());
 
         if (distanceToTarget > RoughActionState.ROUGH_JUMP_THRESHOLD) {
             // Point toward target and sprint
@@ -503,16 +486,18 @@ public class PlayerController {
             float targetYaw = (float) Math.toDegrees(Math.atan2(-direction.x, direction.z));
 
             // Set rotation (immediate for jump phase)
-            client.player.setYaw(targetYaw);
+            if (client.player != null) {
+                client.player.setYaw(targetYaw);
+            }
 
             // Move forward
             client.options.forwardKey.setPressed(true);
 
             // Sprint if the total horizontal distance is more than 2 blocks
-            client.options.sprintKey.setPressed(distanceToTarget > RoughActionState.ROUGH_JUMP_NOSPRINT_THRESHOLD);
+            client.options.sprintKey.setPressed(jumpGap > RoughActionState.ROUGH_JUMP_NOSPRINT_THRESHOLD);
 
             // If the bottom half of our hitbox is within a ladder block, hold shift
-            if (client.player.isClimbing()) {
+            if (client.player != null && client.player.isClimbing()) {
                 client.options.sneakKey.setPressed(true);
                 client.options.jumpKey.setPressed(false);
             } else {
@@ -524,7 +509,7 @@ public class PlayerController {
             client.options.jumpKey.setPressed(false);
             client.options.sneakKey.setPressed(true);
             sneaktimer = 4; // 4 ticks of sneak
-            if (client.player.jumping) {
+            if (client.player != null && client.player.jumping) {
                 backtraceTimer = 4; // 8 ticks of backtrace
                 client.options.backKey.setPressed(true);
             } else {
@@ -535,46 +520,44 @@ public class PlayerController {
         }
     }
 
-    private static void handleCorner(MinecraftClient client) {
+    private static void handleCorner(MinecraftClient client, boolean isBack) {
+        ChatMessageUtil.sendInfo(client, String.valueOf(genericState.phase));
         switch (genericState.phase) {
             case 0: // Point camera toward target (using BLOCK level position, so rotation is an interval of 90 degrees)
+                ChatMessageUtil.sendInfo(client, "asd");
                 if (!genericState.rotationComplete) {
-
+                    if (client.player == null) return;
                     Vec3d direction = genericState.targetPosition.subtract(client.player.getPos()).normalize();
                     float targetYaw = (float) Math.toDegrees(Math.atan2(-direction.x, direction.z));
 
                     // Round rotation to nearest 90 degrees
                     float roundedYaw = Math.round(targetYaw / 90.0f) * 90.0f;
 
-                    // Check if we're close enough to the target rotation
-                    float currentYaw = client.player.getYaw() % 360;
-                    float yawDifference = Math.abs(currentYaw - roundedYaw);
-                    // Handle yaw wrap-around (360 degrees)
-                    if (yawDifference > 180) {
-                        yawDifference = 360 - yawDifference;
-                    }
+                    // Normalize current yaw to the range [-180, 180]
+                    float currentYaw = MathHelper.wrapDegrees(client.player.getYaw());
 
+                    // Calculate the shortest difference, handling wrap-around
+                    float yawDifference = MathHelper.wrapDegrees(roundedYaw - currentYaw);
+
+                    // Check if we're close enough to the target rotation
                     if (Math.abs(yawDifference) < 0.1f) {
                         genericState.rotationComplete = true;
-                        genericState.phase = 1;
                         rotationTimer = 0; // Stop rotation
-                    }
-
-                    // Set target yaw
-                    if (rotationTimer == 0) {
-                        startYaw = currentYaw;
-                        PlayerController.targetYaw = roundedYaw;
-                        rotationTimer = ROTATION_DURATION;
-                        genericState.rotationComplete = false; // Reset for next rotation
+                         genericState.phase = 1; // Move to next phase if needed
+                    } else {
+                        // Set target yaw for smooth rotation
+                        if (rotationTimer == 0) {
+                            startYaw = currentYaw;
+                            System.out.println("DEBUG: Starting rotation from " + startYaw + " to " + roundedYaw);
+                            PlayerController.targetYaw = roundedYaw;
+                            rotationTimer = ROTATION_DURATION;
+                            genericState.rotationComplete = false; // Ensure we are not yet complete
+                        }
                     }
                 }
                 break;
             case 1:
-                // handleCorner must face the target position, then move forward and right until we stop moving (in the corner)
-                if (genericState.targetPosition == null) {
-                    genericState.isActive = false;
-                    return;
-                }
+                if (client.player == null) return;
                 Vec3d playerPos = client.player.getPos();
                 if (playerPos != genericState.lastValidPosition) {
 //                    // Point toward target
@@ -583,13 +566,25 @@ public class PlayerController {
 //                    client.player.setYaw(targetYaw);
 
                     // Move forward
-                    client.options.forwardKey.setPressed(true);
-                    client.options.rightKey.setPressed(true);
+                    if (isBack) {
+                        client.options.backKey.setPressed(true);
+                        client.options.leftKey.setPressed(true);
+                    } else {
+                        client.options.forwardKey.setPressed(true);
+                        client.options.rightKey.setPressed(true);
+                    }
                     client.options.sneakKey.setPressed(true);
                 } else {
                     // We've reached the corner - stop just forward and right movement
                     client.options.forwardKey.setPressed(false);
                     client.options.rightKey.setPressed(false);
+                    client.options.backKey.setPressed(false);
+                    client.options.leftKey.setPressed(false);
+                    if (isBack) {
+//                        genericState.isActive = false; // Complete the action
+//                        genericState.phase = 0; // Reset phase for next use
+                        return;
+                    }
                     genericTimer = 0;
                     genericState.phase = 2;
                 }
@@ -604,6 +599,7 @@ public class PlayerController {
                     client.options.backKey.setPressed(true);
                     client.options.rightKey.setPressed(true);
                     // Smoothly rotate toward the target yaw (NEO_ROTATION_OFFSET)
+                    if (client.player == null) return;
                     float currentYaw = client.player.getYaw() % 360;
                     float targetYaw = currentYaw + (NEO_ROTATION_OFFSET / 6.0f);
                     client.player.setYaw(targetYaw);

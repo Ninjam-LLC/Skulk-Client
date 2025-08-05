@@ -1,7 +1,7 @@
 package com.ariesninja.skulkpk.client.core;
 
 import com.ariesninja.skulkpk.client.core.rendering.SelectionRenderer;
-import com.ariesninja.skulkpk.client.util.ChatMessageUtil;
+import com.ariesninja.skulkpk.client.core.utils.ChatMessageUtil;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.BlockPos;
@@ -32,13 +32,18 @@ public class BlockSelector {
         return selectedBlock;
     }
 
-    public static void clearSelection() {
+    public static void clearSelectionSilent() {
         selectedBlock = null;
         SelectionRenderer.hideAllHighlights();
+    }
 
+    public static void clearSelection() {
+        clearSelectionSilent();
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player != null) {
             ChatMessageUtil.sendWarn(client, "Selection cleared");
         }
     }
+
+
 }

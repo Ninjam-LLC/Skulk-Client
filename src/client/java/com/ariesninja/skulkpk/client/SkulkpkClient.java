@@ -3,17 +3,16 @@ package com.ariesninja.skulkpk.client;
 import com.ariesninja.skulkpk.client.core.*;
 import com.ariesninja.skulkpk.client.core.physics.utils.Ledge;
 import com.ariesninja.skulkpk.client.core.rendering.SelectionRenderer;
+import com.ariesninja.skulkpk.client.core.utils.ModStateManager;
 import com.ariesninja.skulkpk.client.license.LicenseInputScreen;
 import com.ariesninja.skulkpk.client.license.LicenseManager;
 import com.ariesninja.skulkpk.client.license.LicenseVerificationService;
 import com.ariesninja.skulkpk.client.pk.AutoJumpHelper;
-import com.ariesninja.skulkpk.client.util.ChatMessageUtil;
+import com.ariesninja.skulkpk.client.core.utils.ChatMessageUtil;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.world.RaycastContext;
 
@@ -90,21 +89,21 @@ public class SkulkpkClient implements ClientModInitializer {
             }
         }
 
-        if (Keybinds.TEST_KEY_1.wasPressed()) {
-            // This key can be used for testing purposes, e.g., to trigger a specific action or log information
-            PlayerController.cvmRotatePlayer(client);
-        }
-
-        if (Keybinds.TEST_KEY_2.wasPressed()) {
-            PlayerController.cvmMovePlayer(client);
-        }
-
-        // Debug key to log AutoJumpHelper value when held
-        if (Keybinds.DEBUG_AUTOJUMP_KEY.isPressed() && client.player != null) {
-            boolean state0 = AutoJumpHelper.INSTANCE.shouldAutoJump(client.player, client);
-            boolean state1 = Ledge.shouldAutoJump(0.001);
-            System.out.println("state0: " + state0 + ", state1: " + state1);
-        }
+//        if (Keybinds.TEST_KEY_1.wasPressed()) {
+//            // This key can be used for testing purposes, e.g., to trigger a specific action or log information
+//            PlayerController.cvmRotatePlayer(client);
+//        }
+//
+//        if (Keybinds.TEST_KEY_2.wasPressed()) {
+//            PlayerController.cvmMovePlayer(client);
+//        }
+//
+//        // Debug key to log AutoJumpHelper value when held
+//        if (Keybinds.DEBUG_AUTOJUMP_KEY.isPressed() && client.player != null) {
+//            boolean state0 = AutoJumpHelper.INSTANCE.shouldAutoJump(client.player, client);
+//            boolean state1 = Ledge.shouldAutoJump(0.001);
+//            System.out.println("state0: " + state0 + ", state1: " + state1);
+//        }
 
         // Call tick methods for ongoing execution
         StepExecutor.getInstance().tick(client);
