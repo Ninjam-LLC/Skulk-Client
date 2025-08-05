@@ -4,8 +4,11 @@ import com.ariesninja.skulkpk.client.core.data.Step;
 import com.ariesninja.skulkpk.client.core.physics.Align;
 import com.ariesninja.skulkpk.client.core.physics.Momentum;
 import com.ariesninja.skulkpk.client.core.physics.Avoidance;
+import com.ariesninja.skulkpk.client.core.physics.Obstructions;
+import com.jcraft.jorbis.Block;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 
 import java.util.*;
@@ -21,23 +24,23 @@ public class JumpPlanner {
         private final Vec3d targetPos;
         private final double distance;
         private final double heightDifference;
-        private final boolean requiresSprint;
-        private final boolean requiresJump;
+        private final double offset;
         private final Vec3d recommendedDirection;
-        private final Map<String, Object> additionalData;
+        private final BlockPos jumpBlockPos;
+        private final BlockPos targetBlockPos;
 
         public JumpLogistics(Vec3d momentumStartPos, Vec3d jumpPos, Vec3d targetPos, double distance,
-                             double heightDifference, boolean requiresSprint, boolean requiresJump,
-                             Vec3d recommendedDirection) {
+                             double heightDifference, double offset,
+                             Vec3d recommendedDirection, BlockPos jumpBlockPos, BlockPos targetBlockPos) {
             this.momentumStartPos = momentumStartPos;
             this.jumpPos = jumpPos;
             this.targetPos = targetPos;
             this.distance = distance;
             this.heightDifference = heightDifference;
-            this.requiresSprint = requiresSprint;
-            this.requiresJump = requiresJump;
+            this.offset = offset;
             this.recommendedDirection = recommendedDirection;
-            this.additionalData = new HashMap<>();
+            this.jumpBlockPos = jumpBlockPos;
+            this.targetBlockPos = targetBlockPos;
         }
 
         // Getters
@@ -46,10 +49,10 @@ public class JumpPlanner {
         public Vec3d getTargetPos() { return targetPos; }
         public double getDistance() { return distance; }
         public double getHeightDifference() { return heightDifference; }
-        public boolean requiresSprint() { return requiresSprint; }
-        public boolean requiresJump() { return requiresJump; }
+        public double getOffset() { return offset; }
         public Vec3d getRecommendedDirection() { return recommendedDirection; }
-        public Map<String, Object> getAdditionalData() { return additionalData; }
+        public BlockPos getJumpBlockPos() { return jumpBlockPos; }
+        public BlockPos getTargetBlockPos() { return targetBlockPos; }
     }
 
     /**
@@ -123,9 +126,17 @@ public class JumpPlanner {
                 ", Advanced Momentum: " + requiresAdvancedMomentum +
                 ", Obstacle Avoidance: " + requiresObstacleAvoidance);
 
+        if (Obstructions.isMinorNeo(client, logistics)) {
+            System.out.println("JumpPlanner: Short neo jump detected, using neo A strategy");
+            // Use the neo A strategy for minor neos
+            steps.add(Step.unitSafeCorner());
+            steps.add(Step.neoA());
+            return new StepSequence(steps);
+        }
+
         // For now, all physics checks return false, so we use the simple 3-step strategy
         if (!requiresPreciseAlignment && !requiresAdvancedMomentum && !requiresObstacleAvoidance) {
-            // Use the simple 3-step rough jump strategy
+            //            // Use the simple 3-step rogh jump strategy
             if (requiresAnyMomentum) {
                 steps.add(Step.roughStart());
             }

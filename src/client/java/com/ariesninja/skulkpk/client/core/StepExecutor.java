@@ -3,6 +3,7 @@ package com.ariesninja.skulkpk.client.core;
 import com.ariesninja.skulkpk.client.core.data.Step;
 import com.ariesninja.skulkpk.client.core.JumpPlanner.JumpLogistics;
 import com.ariesninja.skulkpk.client.core.JumpPlanner.StepSequence;
+import com.ariesninja.skulkpk.client.core.physics.Dist;
 import com.ariesninja.skulkpk.client.util.ChatMessageUtil;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.BlockPos;
@@ -82,12 +83,9 @@ public class StepExecutor {
         Vec3d targetPos = Vec3d.ofCenter(targetBlock);
 
         // Calculate logistics data based on jump to target distance
-        double distance = jumpPos.distanceTo(targetPos);
+        double distance = Dist.realDistance(jumpFromBlock, targetBlock);
         double heightDifference = targetPos.y - jumpPos.y;
-
-        // Determine if sprint/jump is required based on distance and height
-        boolean requiresSprint = distance > 3.0 || heightDifference > 0;
-        boolean requiresJump = distance > 1.5 || heightDifference > 0;
+        double offset = Dist.offset(jumpFromBlock, targetBlock);
 
         // Calculate recommended direction from jump position to target
         Vec3d direction = targetPos.subtract(jumpPos).normalize();
@@ -95,8 +93,10 @@ public class StepExecutor {
         // Create and observe the logistics
         JumpLogistics logistics = new JumpLogistics(
             momentumStartPos, jumpPos, targetPos, distance, heightDifference,
-            requiresSprint, requiresJump, direction
+            offset, direction, jumpFromBlock, targetBlock
         );
+
+        System.out.println("REAL DISTANCE: " + distance);
 
         jumpPlanner.observeLogistics(logistics);
         return true;
@@ -163,15 +163,14 @@ public class StepExecutor {
         Vec3d targetPos = Vec3d.ofCenter(targetBlock);
 
         // Calculate logistics data based on jump to target distance
-        double distance = jumpPos.distanceTo(targetPos);
+        double distance = Dist.realDistance(jumpFromBlock, targetBlock);
         double heightDifference = targetPos.y - jumpPos.y;
-        boolean requiresSprint = distance > 3.0 || heightDifference > 0;
-        boolean requiresJump = distance > 1.5 || heightDifference > 0;
+        double offset = Dist.offset(jumpFromBlock, targetBlock);
         Vec3d direction = targetPos.subtract(jumpPos).normalize();
 
         return new JumpLogistics(
             momentumStartPos, jumpPos, targetPos, distance, heightDifference,
-            requiresSprint, requiresJump, direction
+            offset, direction, jumpFromBlock, targetBlock
         );
     }
 

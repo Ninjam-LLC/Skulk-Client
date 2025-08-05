@@ -2,6 +2,7 @@ package com.ariesninja.skulkpk.client.core;
 
 import com.ariesninja.skulkpk.client.core.data.Step;
 import com.ariesninja.skulkpk.client.core.JumpPlanner.JumpLogistics;
+import com.ariesninja.skulkpk.client.core.physics.Obstructions;
 import com.ariesninja.skulkpk.client.core.physics.utils.Ledge;
 import com.ariesninja.skulkpk.client.pk.AutoJumpHelper;
 import net.minecraft.client.MinecraftClient;
@@ -15,15 +16,20 @@ public class PlayerController {
     private static int rotationTimer = 0;
     private static int sneaktimer = 0;
     private static int backtraceTimer = 0;
+    private static int genericTimer = 0;
 
     private static float startYaw = 0.0f;
     private static float targetYaw = 0.0f;
+
+    // Specific constants
     private static final int ROTATION_DURATION = 5; // 20 ticks (1 second at 20 TPS)
+    private static final float NEO_ROTATION_OFFSET = 3.2f; // Degrees
 
     // Step execution state
     private static Step currentStep = null;
     private static JumpLogistics currentLogistics = null;
     private static RoughActionState roughState = null;
+    private static GenericActionState genericState = null;
 
     // Rough action state tracking
     private static class RoughActionState {
@@ -31,7 +37,6 @@ public class PlayerController {
         int phase = 0; // Different phases for multi-phase actions
         Vec3d targetPosition = null;
         Vec3d nextStepPosition = null;
-        float targetYaw = 0.0f;
         boolean rotationComplete = false;
         boolean movementComplete = false;
 
@@ -46,6 +51,20 @@ public class PlayerController {
         static final double ROUGH_JUMP_THRESHOLD = 1.0; // blocks from target
         static final double EDGE_DETECTION_THRESHOLD = 0.1; // blocks from block edge
         static final double ROUGH_JUMP_NOSPRINT_THRESHOLD = 3.8; // the jump gap to target without sprint
+    }
+
+    // Generic action state tracking
+    private static class GenericActionState {
+        boolean isActive = false;
+        int phase = 0;
+        Vec3d targetPosition = null;
+        Vec3d nextStepPosition = null;
+        boolean rotationComplete = false;
+        boolean movementComplete = false;
+
+        Vec3d lastValidPosition = null;
+
+        static final double JUMP_THRESHOLD = 0.6;
     }
 
     // Test method to rotate user (with smooth lerp over time)
@@ -72,12 +91,27 @@ public class PlayerController {
         currentStep = step;
         currentLogistics = logistics;
 
+        // Add null checks to prevent NullPointerException
+        if (step == null) {
+            System.err.println("PlayerController: Cannot execute null step!");
+            return;
+        }
+
+        if (step.getAction() == null) {
+            System.err.println("PlayerController: Cannot execute step with null action type!");
+            return;
+        }
+
         if (step.getAction() == Step.ActionType.ROUGH_START ||
-            step.getAction() == Step.ActionType.ROUGH_MOMENTUM ||
-            step.getAction() == Step.ActionType.ROUGH_JUMP) {
+                step.getAction() == Step.ActionType.ROUGH_MOMENTUM ||
+                step.getAction() == Step.ActionType.ROUGH_JUMP) {
 
             initializeRoughAction(step.getAction());
+        } else {
+            // Initialize generic action state for other action types
+            initializeGenericAction(step.getAction());
         }
+
 
         System.out.println("PlayerController: Executing step - " + step.getAction());
     }
@@ -122,6 +156,30 @@ public class PlayerController {
         }
     }
 
+    private static void initializeGenericAction(Step.ActionType actionType) {
+        if (genericState == null) {
+            genericState = new GenericActionState();
+        }
+
+        genericState.isActive = true;
+        genericState.phase = 0;
+        genericState.rotationComplete = false;
+        genericState.movementComplete = false;
+
+        switch (actionType) {
+            case UNIT_SAFE_CORNER:
+                genericState.targetPosition = currentLogistics.getTargetPos();
+                break;
+            case NEO_A:
+                genericState.targetPosition = currentLogistics.getJumpPos();
+                genericState.nextStepPosition = currentLogistics.getTargetPos();
+                break;
+            default:
+                // Other actions can be handled here
+                break;
+        }
+    }
+
     /**
      * Checks if the current step is complete
      */
@@ -134,7 +192,7 @@ public class PlayerController {
             case ROUGH_JUMP:
                 return roughState != null && !roughState.isActive;
             default:
-                return true; // Other action types complete immediately for now
+                return genericState != null && !genericState.isActive;
         }
     }
 
@@ -197,6 +255,11 @@ public class PlayerController {
         if (roughState != null && roughState.isActive && currentStep != null && client.player != null) {
             handleRoughAction(client);
         }
+
+        // Handle generic action execution
+        if (genericState != null && genericState.isActive && currentStep != null && client.player != null) {
+            handleGenericAction(client);
+        }
     }
 
     /**
@@ -214,6 +277,22 @@ public class PlayerController {
                 break;
             case ROUGH_JUMP:
                 handleRoughJump(client, playerPos);
+                break;
+        }
+    }
+
+    private static void handleGenericAction(MinecraftClient client) {
+        Vec3d playerPos = client.player.getPos();
+
+        switch (currentStep.getAction()) {
+            case UNIT_SAFE_CORNER:
+                handleCorner(client);
+                break;
+            case NEO_A:
+                handleNeoA(client);
+                break;
+            default:
+                // Other actions can be handled here
                 break;
         }
     }
@@ -329,7 +408,7 @@ public class PlayerController {
         boolean atBlockEdgeLegacy = AutoJumpHelper.INSTANCE.shouldAutoJump(client.player, client);
 
         System.out.println("At block edge (legacy): " + atBlockEdgeLegacy +
-                           ", At block edge (new): " + atBlockEdge);
+                ", At block edge (new): " + atBlockEdge);
 
         // Update last valid position if we're still on solid ground
         if (!atBlockEdge) {
@@ -337,8 +416,8 @@ public class PlayerController {
         }
 
         System.out.println("Distance to jump pos: " + distanceToJumpPos +
-                         ", Has entered threshold: " + roughState.hasEnteredThreshold +
-                         ", At block edge: " + atBlockEdge);
+                ", Has entered threshold: " + roughState.hasEnteredThreshold +
+                ", At block edge: " + atBlockEdge);
 
         // Stop conditions:
         // A) We're at the edge of a block and about to fall
@@ -348,7 +427,7 @@ public class PlayerController {
         }
 
         // B) We've entered the threshold and are now exiting it (moving away)
-        if (roughState.hasEnteredThreshold && distanceToJumpPos > RoughActionState.ROUGH_MOMENTUM_THRESHOLD && false) {
+        if (false) {
             roughState.isActive = false;
             System.out.println("PlayerController: ROUGH_MOMENTUM completed - exited threshold zone");
         }
@@ -430,11 +509,7 @@ public class PlayerController {
             client.options.forwardKey.setPressed(true);
 
             // Sprint if the total horizontal distance is more than 2 blocks
-            if (distanceToTarget > RoughActionState.ROUGH_JUMP_NOSPRINT_THRESHOLD) {
-                client.options.sprintKey.setPressed(true);
-            } else {
-                client.options.sprintKey.setPressed(false);
-            }
+            client.options.sprintKey.setPressed(distanceToTarget > RoughActionState.ROUGH_JUMP_NOSPRINT_THRESHOLD);
 
             // If the bottom half of our hitbox is within a ladder block, hold shift
             if (client.player.isClimbing()) {
@@ -457,6 +532,187 @@ public class PlayerController {
             }
             roughState.isActive = false;
             System.out.println("PlayerController: ROUGH_JUMP completed");
+        }
+    }
+
+    private static void handleCorner(MinecraftClient client) {
+        switch (genericState.phase) {
+            case 0: // Point camera toward target (using BLOCK level position, so rotation is an interval of 90 degrees)
+                if (!genericState.rotationComplete) {
+
+                    Vec3d direction = genericState.targetPosition.subtract(client.player.getPos()).normalize();
+                    float targetYaw = (float) Math.toDegrees(Math.atan2(-direction.x, direction.z));
+
+                    // Round rotation to nearest 90 degrees
+                    float roundedYaw = Math.round(targetYaw / 90.0f) * 90.0f;
+
+                    // Check if we're close enough to the target rotation
+                    float currentYaw = client.player.getYaw() % 360;
+                    float yawDifference = Math.abs(currentYaw - roundedYaw);
+                    // Handle yaw wrap-around (360 degrees)
+                    if (yawDifference > 180) {
+                        yawDifference = 360 - yawDifference;
+                    }
+
+                    if (Math.abs(yawDifference) < 0.1f) {
+                        genericState.rotationComplete = true;
+                        genericState.phase = 1;
+                        rotationTimer = 0; // Stop rotation
+                    }
+
+                    // Set target yaw
+                    if (rotationTimer == 0) {
+                        startYaw = currentYaw;
+                        PlayerController.targetYaw = roundedYaw;
+                        rotationTimer = ROTATION_DURATION;
+                        genericState.rotationComplete = false; // Reset for next rotation
+                    }
+                }
+                break;
+            case 1:
+                // handleCorner must face the target position, then move forward and right until we stop moving (in the corner)
+                if (genericState.targetPosition == null) {
+                    genericState.isActive = false;
+                    return;
+                }
+                Vec3d playerPos = client.player.getPos();
+                if (playerPos != genericState.lastValidPosition) {
+//                    // Point toward target
+//                    Vec3d direction = genericState.targetPosition.subtract(playerPos).normalize();
+//                    float targetYaw = (float) Math.toDegrees(Math.atan2(-direction.x, direction.z));
+//                    client.player.setYaw(targetYaw);
+
+                    // Move forward
+                    client.options.forwardKey.setPressed(true);
+                    client.options.rightKey.setPressed(true);
+                    client.options.sneakKey.setPressed(true);
+                } else {
+                    // We've reached the corner - stop just forward and right movement
+                    client.options.forwardKey.setPressed(false);
+                    client.options.rightKey.setPressed(false);
+                    genericTimer = 0;
+                    genericState.phase = 2;
+                }
+                genericState.lastValidPosition = playerPos; // Update last valid position
+                break;
+            case 2:
+                // Move backward and right for some ticks, and do a linear approach to the target rotation
+                if (genericTimer == 0) {
+                    genericTimer = 6;
+                } else {
+                    genericTimer--;
+                    client.options.backKey.setPressed(true);
+                    client.options.rightKey.setPressed(true);
+                    // Smoothly rotate toward the target yaw (NEO_ROTATION_OFFSET)
+                    float currentYaw = client.player.getYaw() % 360;
+                    float targetYaw = currentYaw + (NEO_ROTATION_OFFSET / 6.0f);
+                    client.player.setYaw(targetYaw);
+                    if (genericTimer == 0) {
+                        client.options.backKey.setPressed(false);
+                        client.options.rightKey.setPressed(false);
+                        genericState.phase = 3;
+                    }
+                }
+                break;
+            case 3:
+                // Wait before unshifting and completing the action
+                if (genericTimer == 0) {
+                    genericTimer = 3;
+                } else {
+                    genericTimer--;
+                    if (genericTimer == 0) {
+                        client.options.sneakKey.setPressed(false); // Unshift
+                        genericState.isActive = false; // Complete the action
+                        genericState.phase = 0; // Reset phase for next use
+                        genericState.targetPosition = null; // Clear target position
+                        System.out.println("PlayerController: UNIT_SAFE_CORNER completed");
+                    }
+                }
+        }
+    }
+
+    private static void handleNeoA(MinecraftClient client) {
+        if (genericState.targetPosition == null) {
+            genericState.isActive = false;
+            return;
+        }
+        Vec3d playerPos = client.player.getPos();
+        BlockPos startBlock = BlockPos.ofFloored(genericState.targetPosition);
+        BlockPos endBlock = BlockPos.ofFloored(genericState.nextStepPosition);
+        // Check whether jump is X facing or Z facing
+        boolean isXFacing = Math.abs(startBlock.getX() - endBlock.getX()) > Math.abs(startBlock.getZ() - endBlock.getZ());
+        switch (genericState.phase) {
+            case 0:
+                // Run and jump forward (no rotate)
+                client.options.forwardKey.setPressed(true);
+                client.options.sprintKey.setPressed(true);
+                if (genericTimer == 0) {
+                    genericTimer = 1; // Run for 1 tick
+                } else {
+                    genericTimer--;
+                    client.options.jumpKey.setPressed(true);
+                }
+                // Run until our X or Z (whichever is the direction of the jump) is beyond the clamped position of the players hitbox (.7 for positive, .3 for negative) on the jump block
+                if (isXFacing) {
+                    // X facing jump
+                    if (playerPos.getX() > startBlock.getX() + 0.7 || playerPos.getX() < startBlock.getX() + 0.3) {
+                        genericState.phase = 1; // Move to next phase
+                    }
+                } else {
+                    // Z facing jump
+                    if (playerPos.getZ() > startBlock.getZ() + 0.7 || playerPos.getZ() < startBlock.getZ() + 0.3) {
+                        genericState.phase = 1; // Move to next phase
+                    }
+                }
+                break;
+            case 1:
+                // Stop the jump key
+                client.options.jumpKey.setPressed(false);
+                // Round current camera angle to nearest 90 degrees (easy way to get back to "forward" facing)
+                float currentYaw = client.player.getYaw() % 360;
+                float roundedYaw = Math.round(currentYaw / 90.0f) * 90.0f;
+                client.player.setYaw(roundedYaw);
+                // Continue straight until our X or Z (whichever is the direction of the jump) is beyond the clamped position of the players hitbox (.7 for positive, .3 for negative) on the BLOCK AFTER the last prop
+                BlockPos lastProp = Obstructions.getBlockAfterLastProp(client, currentLogistics);
+                System.out.println("Last prop position: " + lastProp);
+                if (isXFacing) {
+                    // X facing jump
+                    if (lastProp != null && (playerPos.getX() < lastProp.getX() + 1.8 && playerPos.getX() > lastProp.getX() - 0.5)) {
+                        System.out.println("Moving to next phase after X facing jump. Player X: " + playerPos.getX() + ", Last prop X: " + lastProp.getX());
+                        genericState.phase = 2; // Move to next phase
+                    }
+                } else {
+                    // Z facing jump
+                    if (lastProp != null && (playerPos.getZ() < lastProp.getZ() + 1.8 && playerPos.getZ() > lastProp.getZ() - 0.5)) {
+                        System.out.println("Moving to next phase after Z facing jump. Player Z: " + playerPos.getZ() + ", Last prop Z: " + lastProp.getZ());
+                        genericState.phase = 2; // Move to next phase
+                    }
+                }
+                break;
+            case 2:
+                double distanceToTarget = playerPos.distanceTo(genericState.nextStepPosition);
+                if (distanceToTarget > GenericActionState.JUMP_THRESHOLD) {
+                    // Point toward target and sprint
+                    Vec3d direction = genericState.nextStepPosition.subtract(playerPos).normalize();
+                    float targetYaw = (float) Math.toDegrees(Math.atan2(-direction.x, direction.z));
+
+                    // Set rotation (immediate for jump phase)
+                    client.player.setYaw(targetYaw);
+                } else {
+                    // We've reached the target area - stop everything
+                    stopAllMovement(client);
+                    client.options.sneakKey.setPressed(true);
+                    sneaktimer = 4; // 4 ticks of sneak
+                    if (client.player.jumping) {
+                        backtraceTimer = 4; // 8 ticks of backtrace
+                        client.options.backKey.setPressed(true);
+                    } else {
+                        backtraceTimer = 0; // No backtrace if not on ground
+                    }
+                    genericState.isActive = false;
+                    System.out.println("PlayerController: ROUGH_JUMP completed");
+                }
+                break;
         }
     }
 
